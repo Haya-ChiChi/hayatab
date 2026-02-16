@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "name": "Tab Organizer",
+  "version": "1.0.0",
+  "description": "AI-powered tab grouping using Claude",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "background": {
+    "scripts": ["background/background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Organize Tabs",
+    "default_icon": {
+      "48": "icons/icon-48.svg",
+      "96": "icons/icon-96.svg"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
+  },
+  "icons": {
+    "48": "icons/icon-48.svg",
+    "96": "icons/icon-96.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tab-organizer@hayase.moe",
+      "strict_min_version": "138.0"
+    }
+  }
+}

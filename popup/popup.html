@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- No API Key -->
+  <div id="view-no-key" class="view hidden">
+    <div class="center-content">
+      <p class="message">No API key configured.</p>
+      <button id="btn-open-options" class="btn btn-primary">Open Settings</button>
+    </div>
+  </div>
+
+  <!-- Ready -->
+  <div id="view-ready" class="view hidden">
+    <div class="center-content">
+      <h1 class="title">Tab Organizer</h1>
+      <p class="subtitle" id="tab-count"></p>
+      <button id="btn-analyze" class="btn btn-primary">Analyze Tabs</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="view-loading" class="view hidden">
+    <div class="center-content">
+      <div class="spinner"></div>
+      <p class="message">Analyzing your tabs...</p>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="view-results" class="view hidden">
+    <div class="results-header">
+      <h2 class="results-title">Suggested Groups</h2>
+    </div>
+    <div id="groups-list"></div>
+    <div class="action-row">
+      <button id="btn-reanalyze" class="btn btn-secondary">Re-analyze</button>
+      <button id="btn-apply" class="btn btn-primary">Apply Groups</button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="view-error" class="view hidden">
+    <div class="center-content">
+      <p class="message error-text" id="error-message"></p>
+      <button id="btn-retry" class="btn btn-primary">Try Again</button>
+    </div>
+  </div>
+
+  <!-- Done -->
+  <div id="view-done" class="view hidden">
+    <div class="center-content">
+      <div class="checkmark">&#10003;</div>
+      <p class="message">Tabs organized!</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

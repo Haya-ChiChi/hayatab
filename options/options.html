@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Tab Organizer Settings</h1>
+
+    <div class="field">
+      <label for="api-key">Claude API Key</label>
+      <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" />
+    </div>
+
+    <div class="actions">
+      <button id="btn-save" class="btn btn-primary">Save</button>
+      <span id="status" class="status"></span>
+    </div>
+
+    <p class="notice">
+      Tab titles and URLs are sent to Anthropic's API for analysis.
+      Your API key is stored locally in this browser only.
+    </p>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
