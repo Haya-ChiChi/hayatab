@@ -41,7 +41,7 @@ async function handleAnalyzeTabs() {
   const { apiKey } = await browser.storage.local.get("apiKey");
   if (!apiKey) throw new Error("No API key configured. Open extension settings.");
 
-  const tabs = await browser.tabs.query({ currentWindow: true });
+  const tabs = await browser.tabs.query({ currentWindow: true, pinned: false });
   if (tabs.length === 0) throw new Error("No tabs to organize.");
 
   const tabData = tabs.map((t) => ({ id: t.id, title: t.title, url: t.url }));
@@ -61,22 +61,35 @@ async function handleAnalyzeTabs() {
 }
 
 async function handleApplyGroups({ groups }) {
-  const { id: windowId } = await browser.windows.getCurrent();
+  const currentTabs = await browser.tabs.query({ currentWindow: true });
+  const validTabIds = new Set(currentTabs.map((t) => t.id));
+  const windowId = currentTabs[0]?.windowId;
 
+  let applied = 0;
   for (const group of groups) {
-    const groupId = await browser.tabs.group({
-      tabIds: group.tabIds,
-      createProperties: { windowId },
-    });
+    // Filter out tabs that were closed since analysis
+    const validIds = group.tabIds.filter((id) => validTabIds.has(id));
+    if (validIds.length === 0) continue;
 
-    if (browser.tabGroups?.update) {
-      await browser.tabGroups.update(groupId, {
-        title: group.name,
-        color: group.color,
+    try {
+      const groupId = await browser.tabs.group({
+        tabIds: validIds,
+        createProperties: { windowId },
       });
+
+      if (browser.tabGroups?.update) {
+        await browser.tabGroups.update(groupId, {
+          title: group.name,
+          color: group.color,
+        });
+      }
+      applied++;
+    } catch (err) {
+      console.warn(`Failed to create group "${group.name}":`, err);
     }
   }
 
+  if (applied === 0) throw new Error("No groups could be applied. Try re-analyzing.");
   return { ok: true };
 }
 
@@ -93,15 +106,21 @@ async function callClaudeAPI(apiKey, tabData) {
     ],
   };
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (fetchErr) {
+    throw new Error(`Network error: ${fetchErr.message}`);
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -132,18 +151,22 @@ function parseAndValidateGroups(apiResponse, allTabIds) {
   const validColors = new Set(["blue", "cyan", "grey", "green", "orange", "pink", "purple", "red", "yellow"]);
   const allTabIdSet = new Set(allTabIds);
 
+  const assignedIds = new Set();
   for (const group of parsed.groups) {
     // Validate color
     if (!validColors.has(group.color)) group.color = "grey";
-    // Filter out invalid tab IDs
-    group.tabIds = group.tabIds.filter((id) => allTabIdSet.has(id));
+    // Filter out invalid tab IDs and deduplicate across groups
+    group.tabIds = group.tabIds.filter((id) => {
+      if (!allTabIdSet.has(id) || assignedIds.has(id)) return false;
+      assignedIds.add(id);
+      return true;
+    });
   }
 
   // Remove empty groups
   parsed.groups = parsed.groups.filter((g) => g.tabIds.length > 0);
 
   // Find orphaned tabs
-  const assignedIds = new Set(parsed.groups.flatMap((g) => g.tabIds));
   const missingIds = allTabIds.filter((id) => !assignedIds.has(id));
   if (missingIds.length > 0) {
     parsed.groups.push({ name: "Other", color: "grey", tabIds: missingIds });

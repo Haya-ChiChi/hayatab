@@ -5,11 +5,13 @@
   "description": "AI-powered tab grouping using Claude",
   "permissions": [
     "tabs",
-    "storage"
+    "tabGroups",
+    "storage",
+    "https://api.anthropic.com/*"
   ],
   "background": {
     "scripts": ["background/background.js"],
-    "persistent": false
+    "persistent": true
   },
   "browser_action": {
     "default_popup": "popup/popup.html",
