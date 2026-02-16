@@ -59,6 +59,7 @@ function renderGroups(groups) {
   groups.forEach((group, groupIndex) => {
     const card = document.createElement("div");
     card.className = `group-card group-color-${group.color}`;
+    card.style.setProperty('--i', groupIndex);
 
     const header = document.createElement("div");
     header.className = "group-header";
