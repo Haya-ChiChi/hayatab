@@ -71,6 +71,7 @@ body {
 
 .view:not(.hidden) {
   display: block;
+  position: relative;
   animation: fadeSlideIn 150ms ease-out;
 }
 
@@ -157,6 +158,26 @@ body {
 
 .btn-secondary:hover {
   background: var(--border);
+}
+
+/* ── Icon Button ── */
+.btn-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 0;
+}
+
+.btn-icon:hover {
+  color: var(--text);
+  background: var(--bg-surface);
 }
 
 /* ── Spinner ── */

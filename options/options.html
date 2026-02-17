@@ -12,8 +12,30 @@
     <h1>Tab Organizer Settings</h1>
 
     <div class="field">
-      <label for="api-key">Claude API Key</label>
-      <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" />
+      <label for="provider">AI Provider</label>
+      <select id="provider">
+        <option value="claude">Claude (Anthropic)</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
+        <option value="ollama">Ollama (Local)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="model">Model</label>
+      <select id="model"></select>
+    </div>
+
+    <div id="credential-fields"></div>
+
+    <div class="field">
+      <label for="cooldown">Cooldown Between Analyses</label>
+      <select id="cooldown">
+        <option value="5000">5 seconds</option>
+        <option value="10000">10 seconds (default)</option>
+        <option value="30000">30 seconds</option>
+        <option value="60000">1 minute</option>
+      </select>
     </div>
 
     <div class="actions">
@@ -22,8 +44,9 @@
     </div>
 
     <p class="notice">
-      Tab titles and URLs are sent to Anthropic's API for analysis.
-      Your API key is stored locally in this browser only.
+      Tab titles and URLs are sent to your chosen AI provider for analysis.
+      Your API key and settings are stored locally in this browser only.
+      Ollama must be accessible at a localhost URL.
     </p>
   </div>
 

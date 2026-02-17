@@ -24,8 +24,11 @@ function clearChildren(el) {
 }
 
 async function init() {
-  const { apiKey } = await browser.storage.local.get("apiKey");
-  if (!apiKey) {
+  const { provider, apiKey, ollamaUrl } = await browser.storage.local.get([
+    "provider", "apiKey", "ollamaUrl",
+  ]);
+  const configured = provider === "ollama" ? !!ollamaUrl : !!apiKey;
+  if (!configured) {
     showView("noKey");
     return;
   }
@@ -134,6 +137,10 @@ async function applyGroups() {
 
 // Event listeners
 document.getElementById("btn-open-options").addEventListener("click", () => {
+  browser.runtime.openOptionsPage();
+  window.close();
+});
+document.getElementById("btn-settings").addEventListener("click", () => {
   browser.runtime.openOptionsPage();
   window.close();
 });

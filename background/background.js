@@ -20,6 +20,8 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
   ]
 }`;
 
+const DEFAULT_COOLDOWN_MS = 10_000;
+
 const handlers = {
   analyzeTabs: handleAnalyzeTabs,
   applyGroups: handleApplyGroups,
@@ -38,16 +40,36 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function handleAnalyzeTabs() {
-  const { apiKey } = await browser.storage.local.get("apiKey");
-  if (!apiKey) throw new Error("No API key configured. Open extension settings.");
+  const settings = await browser.storage.local.get([
+    "provider", "model", "apiKey", "ollamaUrl", "cooldown", "lastAnalysisTime",
+  ]);
+
+  const provider = settings.provider || "claude";
+
+  // Validate config
+  if (provider === "ollama") {
+    if (!settings.ollamaUrl) throw new Error("No Ollama URL configured. Open extension settings.");
+  } else {
+    if (!settings.apiKey) throw new Error("No API key configured. Open extension settings.");
+  }
+
+  // Rate limiting
+  const cooldown = settings.cooldown || DEFAULT_COOLDOWN_MS;
+  const now = Date.now();
+  if (settings.lastAnalysisTime && (now - settings.lastAnalysisTime) < cooldown) {
+    const wait = Math.ceil((cooldown - (now - settings.lastAnalysisTime)) / 1000);
+    throw new Error(`Please wait ${wait}s before analyzing again.`);
+  }
+  await browser.storage.local.set({ lastAnalysisTime: now });
 
   const tabs = await browser.tabs.query({ currentWindow: true, pinned: false });
   if (tabs.length === 0) throw new Error("No tabs to organize.");
 
   const tabData = tabs.map((t) => ({ id: t.id, title: t.title, url: t.url }));
-  const response = await callClaudeAPI(apiKey, tabData);
+  const apiResponse = await callAPI(provider, settings, tabData);
+  const text = extractText(provider, apiResponse);
   const groups = parseAndValidateGroups(
-    response,
+    text,
     tabs.map((t) => t.id)
   );
 
@@ -62,8 +84,9 @@ async function handleAnalyzeTabs() {
 
 async function handleApplyGroups({ groups }) {
   const currentTabs = await browser.tabs.query({ currentWindow: true });
+  if (currentTabs.length === 0) throw new Error("No open tabs found.");
   const validTabIds = new Set(currentTabs.map((t) => t.id));
-  const windowId = currentTabs[0]?.windowId;
+  const windowId = currentTabs[0].windowId;
 
   let applied = 0;
   for (const group of groups) {
@@ -93,29 +116,77 @@ async function handleApplyGroups({ groups }) {
   return { ok: true };
 }
 
-async function callClaudeAPI(apiKey, tabData) {
-  const body = {
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Organize these tabs:\n${JSON.stringify(tabData, null, 2)}`,
-      },
-    ],
-  };
+async function callAPI(provider, settings, tabData) {
+  const { model, apiKey, ollamaUrl } = settings;
+  const userMessage = `Organize these tabs:\n${JSON.stringify(tabData, null, 2)}`;
 
-  let res;
-  try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
+  let url, headers, body;
+
+  switch (provider) {
+    case "openai": {
+      url = "https://api.openai.com/v1/chat/completions";
+      headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      };
+      body = {
+        model: model || "gpt-4o-mini",
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+      };
+      break;
+    }
+    case "gemini": {
+      const m = model || "gemini-2.0-flash";
+      url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+      headers = { "Content-Type": "application/json" };
+      body = {
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        generationConfig: { maxOutputTokens: 1024 },
+      };
+      break;
+    }
+    case "ollama": {
+      const base = (ollamaUrl || "http://localhost:11434").replace(/\/$/, "");
+      url = `${base}/api/chat`;
+      headers = { "Content-Type": "application/json" };
+      body = {
+        model: model || "llama3.2",
+        stream: false,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+      };
+      break;
+    }
+    case "claude":
+    default: {
+      url = "https://api.anthropic.com/v1/messages";
+      headers = {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
-      },
+      };
+      body = {
+        model: model || "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage }],
+      };
+    }
+  }
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers,
       body: JSON.stringify(body),
     });
   } catch (fetchErr) {
@@ -123,25 +194,50 @@ async function callClaudeAPI(apiKey, tabData) {
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
     if (res.status === 401) throw new Error("Invalid API key. Check Settings.");
-    if (res.status === 429) throw new Error("Rate limited. Wait a moment and try again.");
-    throw new Error(err.error?.message || `API error (${res.status})`);
+    if (res.status === 429) throw new Error("Rate limited by provider. Wait a moment and try again.");
+    // Try JSON first (Claude/OpenAI/Gemini), fall back to plain text (Ollama)
+    const errText = await res.text().catch(() => "");
+    let errMsg = `API error (${res.status})`;
+    try {
+      const errJson = JSON.parse(errText);
+      errMsg = errJson.error?.message || errJson.message || errMsg;
+    } catch {
+      if (errText) errMsg = errText.slice(0, 200);
+    }
+    throw new Error(errMsg);
   }
 
   return await res.json();
 }
 
-function parseAndValidateGroups(apiResponse, allTabIds) {
-  const text = apiResponse.content?.[0]?.text;
-  if (!text) throw new Error("Empty response from Claude.");
+function extractText(provider, apiResponse) {
+  let text;
+  switch (provider) {
+    case "openai":
+      text = apiResponse.choices?.[0]?.message?.content;
+      break;
+    case "gemini":
+      text = apiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+      break;
+    case "ollama":
+      text = apiResponse.message?.content;
+      break;
+    case "claude":
+    default:
+      text = apiResponse.content?.[0]?.text;
+  }
+  if (!text) throw new Error("Empty response from AI provider. Try again.");
+  return text;
+}
 
+function parseAndValidateGroups(text, allTabIds) {
   let parsed;
   try {
     const cleaned = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error("Claude returned invalid JSON. Try again.");
+    throw new Error("AI returned invalid JSON. Try again.");
   }
 
   if (!Array.isArray(parsed.groups) || parsed.groups.length === 0) {
