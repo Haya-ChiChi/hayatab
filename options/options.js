@@ -239,7 +239,7 @@ function renderProviderConfig() {
       field.appendChild(keyRow);
       providerConfig.appendChild(field);
     } else {
-      // No key — show empty input
+      // No key - show empty input
       const field = createField(config.keyLabel, "password", "api-key", config.keyPlaceholder);
       providerConfig.appendChild(field);
     }

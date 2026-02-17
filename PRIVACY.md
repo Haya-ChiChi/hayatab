@@ -1,4 +1,4 @@
-# Privacy Policy — Hayatab
+# Privacy Policy - Hayatab
 
 **Last updated:** 2026-02-17
 
@@ -10,10 +10,10 @@ Hayatab uses AI to analyze your open browser tabs and suggest logical groupings.
 
 When you click "Analyze Tabs", the extension sends **tab titles and URLs** from your current browser window to your chosen AI provider:
 
-- **Claude** (Anthropic) — api.anthropic.com
-- **OpenAI** — api.openai.com
-- **Gemini** (Google) — generativelanguage.googleapis.com
-- **Ollama** (Local) — localhost only, no data leaves your machine
+- **Claude** (Anthropic) - api.anthropic.com
+- **OpenAI** - api.openai.com
+- **Gemini** (Google) - generativelanguage.googleapis.com
+- **Ollama** (Local) - localhost only, no data leaves your machine
 
 No other data is sent. The extension does not transmit browsing history, cookies, passwords, bookmarks, or any personal information beyond tab titles and URLs.
 
