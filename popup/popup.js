@@ -23,11 +23,31 @@ function clearChildren(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", ollama: "Ollama" };
+
+function formatModelName(model) {
+  if (!model) return "";
+  // Strip date suffixes like "-20251001" and preview tags
+  return model
+    .replace(/-\d{8}$/, "")
+    .replace(/-preview.*$/, "")
+    .replace(/^claude-/, "")
+    .replace(/^gpt-/, "GPT-")
+    .replace(/^gemini-/, "Gemini ");
+}
+
 async function init() {
-  const { provider, apiKey, ollamaUrl } = await browser.storage.local.get([
-    "provider", "apiKey", "ollamaUrl",
+  const data = await browser.storage.local.get([
+    "provider", "ollamaUrl",
+    "apiKey_claude", "apiKey_openai", "apiKey_gemini",
+    "apiKey", // legacy fallback
+    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "model", // legacy fallback
   ]);
-  const configured = provider === "ollama" ? !!ollamaUrl : !!apiKey;
+  const provider = data.provider || "claude";
+  const providerKeyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
+  const apiKey = data[providerKeyMap[provider]] || data.apiKey || "";
+  const configured = provider === "ollama" ? !!data.ollamaUrl : !!apiKey;
   if (!configured) {
     showView("noKey");
     return;
@@ -35,6 +55,13 @@ async function init() {
 
   const tabs = await browser.tabs.query({ currentWindow: true });
   document.getElementById("tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
+
+  const model = data["model_" + provider] || data.model || "";
+  const providerName = PROVIDER_NAMES[provider] || provider;
+  const modelName = formatModelName(model);
+  document.getElementById("provider-label").textContent =
+    modelName ? `${providerName} \u00B7 ${modelName}` : providerName;
+
   showView("ready");
 }
 
@@ -127,6 +154,9 @@ async function applyGroups() {
     if (!response.ok) {
       showError(response.error);
       return;
+    }
+    if (response.sortedOnly) {
+      document.querySelector("#view-done .done-text").textContent = "Tabs sorted by group!";
     }
     showView("done");
     setTimeout(() => window.close(), 1200);

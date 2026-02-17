@@ -13,6 +13,7 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
   --green: #4CAF50;
   --red: #C0504D;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +28,7 @@
     --border: #36365A;
     --green: #3BBA5C;
     --red: #FF4A4A;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239090AA' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   }
 }
 
@@ -46,7 +48,7 @@ body {
 }
 
 .container {
-  max-width: 400px;
+  max-width: 420px;
   padding: 24px;
 }
 
@@ -58,44 +60,143 @@ h1 {
   border-bottom: 1px solid var(--border);
 }
 
+/* ── Provider Tabs ── */
+.provider-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.provider-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.provider-tab:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.provider-tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+}
+
+.provider-tab-name {
+  white-space: nowrap;
+}
+
+.in-use-badge {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--green);
+  line-height: 1;
+}
+
+.status-indicator {
+  height: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.status-dot.configured {
+  background: var(--green);
+}
+
+/* ── Fields ── */
 .field {
   margin-bottom: 16px;
 }
 
 label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
+/* ── Password Inputs ── */
 input[type="password"] {
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text);
   font-size: 13px;
   font-family: var(--font-mono);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 input[type="password"]:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+/* ── API Key Display ── */
+.key-display-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.key-display {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  flex: 1;
+}
+
+.btn-sm {
+  padding: 7px 14px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Actions ── */
 .actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 4px;
   margin-bottom: 20px;
 }
 
+/* ── Buttons ── */
 .btn {
-  padding: 8px 20px;
+  padding: 9px 22px;
   border: none;
   border-radius: var(--radius);
   font-family: var(--font-sans);
@@ -122,8 +223,20 @@ input[type="password"]:focus {
   background: var(--accent-hover);
 }
 
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+/* ── Status ── */
 .status {
   font-size: 12px;
+  font-weight: 600;
 }
 
 .status.success {
@@ -134,10 +247,11 @@ input[type="password"]:focus {
   color: var(--red);
 }
 
+/* ── Notice ── */
 .notice {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.7;
   border-top: 1px solid var(--border);
   padding-top: 16px;
 }
@@ -145,16 +259,16 @@ input[type="password"]:focus {
 /* ── Select Inputs ── */
 select {
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text);
   font-size: 13px;
   font-family: var(--font-sans);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6B6B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px;
@@ -164,24 +278,49 @@ select {
 select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ── Text Inputs ── */
 input[type="text"] {
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-surface);
   color: var(--text);
   font-size: 13px;
   font-family: var(--font-mono);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 input[type="text"]:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ── Section Divider ── */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* ── Credential Fields Transition ── */
+#credential-fields .field {
+  animation: fieldReveal 0.2s ease-out;
+}
+
+@keyframes fieldReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Reduced Motion ── */
@@ -192,5 +331,9 @@ input[type="text"]:focus {
 
   .btn:active {
     transform: none;
+  }
+
+  #credential-fields .field {
+    animation: none;
   }
 }

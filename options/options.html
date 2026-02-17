@@ -11,28 +11,18 @@
   <div class="container">
     <h1>Tab Organizer Settings</h1>
 
-    <div class="field">
-      <label for="provider">AI Provider</label>
-      <select id="provider">
-        <option value="claude">Claude (Anthropic)</option>
-        <option value="openai">OpenAI</option>
-        <option value="gemini">Google Gemini</option>
-        <option value="ollama">Ollama (Local)</option>
-      </select>
-    </div>
+    <label>AI Provider</label>
+    <div class="provider-tabs" id="provider-tabs"></div>
 
-    <div class="field">
-      <label for="model">Model</label>
-      <select id="model"></select>
-    </div>
+    <div id="provider-config"></div>
 
-    <div id="credential-fields"></div>
+    <hr class="section-divider" />
 
     <div class="field">
       <label for="cooldown">Cooldown Between Analyses</label>
       <select id="cooldown">
         <option value="5000">5 seconds</option>
-        <option value="10000">10 seconds (default)</option>
+        <option value="10000" selected>10 seconds (default)</option>
         <option value="30000">30 seconds</option>
         <option value="60000">1 minute</option>
       </select>
@@ -45,7 +35,7 @@
 
     <p class="notice">
       Tab titles and URLs are sent to your chosen AI provider for analysis.
-      Your API key and settings are stored locally in this browser only.
+      Your API keys and settings are stored locally in this browser only.
       Ollama must be accessible at a localhost URL.
     </p>
   </div>

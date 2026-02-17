@@ -21,6 +21,7 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
 }`;
 
 const DEFAULT_COOLDOWN_MS = 10_000;
+const IS_ZEN = navigator.userAgent.includes("Zen/");
 
 const handlers = {
   analyzeTabs: handleAnalyzeTabs,
@@ -41,10 +42,19 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function handleAnalyzeTabs() {
   const settings = await browser.storage.local.get([
-    "provider", "model", "apiKey", "ollamaUrl", "cooldown", "lastAnalysisTime",
+    "provider", "cooldown", "lastAnalysisTime", "ollamaUrl",
+    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "apiKey_claude", "apiKey_openai", "apiKey_gemini",
+    // Legacy fallback
+    "apiKey", "model",
   ]);
 
   const provider = settings.provider || "claude";
+
+  // Resolve per-provider API key and model
+  const providerKeyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
+  settings.apiKey = settings[providerKeyMap[provider]] || settings.apiKey || "";
+  settings.model = settings["model_" + provider] || settings.model || "";
 
   // Validate config
   if (provider === "ollama") {
@@ -88,9 +98,15 @@ async function handleApplyGroups({ groups }) {
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
+  if (IS_ZEN) {
+    return applyGroupsBySort(groups, validTabIds);
+  }
+  return applyGroupsByNative(groups, validTabIds, windowId);
+}
+
+async function applyGroupsByNative(groups, validTabIds, windowId) {
   let applied = 0;
   for (const group of groups) {
-    // Filter out tabs that were closed since analysis
     const validIds = group.tabIds.filter((id) => validTabIds.has(id));
     if (validIds.length === 0) continue;
 
@@ -114,6 +130,33 @@ async function handleApplyGroups({ groups }) {
 
   if (applied === 0) throw new Error("No groups could be applied. Try re-analyzing.");
   return { ok: true };
+}
+
+async function applyGroupsBySort(groups, validTabIds) {
+  // Build the desired tab order: groups in sequence, each group's tabs in original order
+  const sortedIds = [];
+  for (const group of groups) {
+    for (const id of group.tabIds) {
+      if (validTabIds.has(id)) sortedIds.push(id);
+    }
+  }
+
+  if (sortedIds.length === 0) throw new Error("No tabs to sort. Try re-analyzing.");
+
+  // Fresh query for pinned count to avoid stale data
+  const pinnedTabs = await browser.tabs.query({ currentWindow: true, pinned: true });
+  const pinnedCount = pinnedTabs.length;
+
+  // Move tabs one by one to their target positions
+  for (let i = 0; i < sortedIds.length; i++) {
+    try {
+      await browser.tabs.move(sortedIds[i], { index: pinnedCount + i });
+    } catch (err) {
+      console.warn(`Failed to move tab ${sortedIds[i]}:`, err);
+    }
+  }
+
+  return { ok: true, sortedOnly: true };
 }
 
 async function callAPI(provider, settings, tabData) {
