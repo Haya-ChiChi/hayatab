@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "Tab Organizer",
+  "name": "Hayatab",
   "version": "1.0.0",
   "description": "AI-powered tab grouping",
   "permissions": [
@@ -18,7 +18,7 @@
   },
   "browser_action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Organize Tabs",
+    "default_title": "Hayatab",
     "default_icon": {
       "48": "icons/icon-48.svg",
       "96": "icons/icon-96.svg"

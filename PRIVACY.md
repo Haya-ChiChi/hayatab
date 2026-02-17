@@ -1,10 +1,10 @@
-# Privacy Policy — Tab Organizer
+# Privacy Policy — Hayatab
 
 **Last updated:** 2026-02-17
 
 ## What This Extension Does
 
-Tab Organizer uses AI to analyze your open browser tabs and suggest logical groupings. It sends tab metadata to an AI provider you choose, then organizes your tabs based on the response.
+Hayatab uses AI to analyze your open browser tabs and suggest logical groupings. It sends tab metadata to an AI provider you choose, then organizes your tabs based on the response.
 
 ## Data Sent Externally
 
