@@ -12,6 +12,7 @@ Thumbs.db
 # Claude Code
 CLAUDE.md
 .claude.local.md
+docs/plans/
 
 # Secrets
 .env
