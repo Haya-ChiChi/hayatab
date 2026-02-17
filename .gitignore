@@ -12,6 +12,10 @@ Thumbs.db
 # Claude Code
 .claude.local.md
 
+# Secrets
+.env
+.env.*
+
 # Extension packaging
 *.zip
 *.xpi
