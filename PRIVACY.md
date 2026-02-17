@@ -48,4 +48,4 @@ The extension makes zero network requests except when you explicitly click "Anal
 
 ## Contact
 
-If you have questions about this privacy policy, open an issue on the [GitHub repository](https://github.com/Haya-ChiChi/tab-organizer).
+If you have questions about this privacy policy, open an issue on the [GitHub repository](https://github.com/Haya-ChiChi/hayatab).
