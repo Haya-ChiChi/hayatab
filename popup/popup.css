@@ -298,6 +298,12 @@ body {
   font-weight: 600;
 }
 
+.stale-indicator {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 #groups-list {
   padding: 0 12px;
   max-height: 360px;
