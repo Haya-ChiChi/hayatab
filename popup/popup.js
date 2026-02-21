@@ -85,7 +85,8 @@ async function init() {
 
   const pending = await browser.runtime.sendMessage({ action: "getPendingGroups" });
   if (pending.ok && pending.groups) {
-    renderGroups(pending.groups);
+    currentGroups = pending.groups;
+    renderGroups(currentGroups);
     showStaleIndicator(pending.timestamp);
     showView("results");
   } else {
