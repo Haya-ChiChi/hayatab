@@ -23,9 +23,13 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
 const DEFAULT_COOLDOWN_MS = 10_000;
 const IS_ZEN = navigator.userAgent.includes("Zen/");
 
+let pendingGroups = null;
+let pendingTimestamp = null;
+
 const handlers = {
   analyzeTabs: handleAnalyzeTabs,
   applyGroups: handleApplyGroups,
+  getPendingGroups: handleGetPendingGroups,
 };
 
 browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -89,6 +93,9 @@ async function handleAnalyzeTabs() {
     group.tabs = group.tabIds.map((id) => ({ id, ...tabMap[id] }));
   }
 
+  pendingGroups = groups;
+  pendingTimestamp = Date.now();
+
   return { ok: true, groups };
 }
 
@@ -98,10 +105,20 @@ async function handleApplyGroups({ groups }) {
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
+  let result;
   if (IS_ZEN) {
-    return applyGroupsBySort(groups, validTabIds);
+    result = await applyGroupsBySort(groups, validTabIds);
+  } else {
+    result = await applyGroupsByNative(groups, validTabIds, windowId);
   }
-  return applyGroupsByNative(groups, validTabIds, windowId);
+
+  pendingGroups = null;
+  pendingTimestamp = null;
+  return result;
+}
+
+async function handleGetPendingGroups() {
+  return { ok: true, groups: pendingGroups, timestamp: pendingTimestamp };
 }
 
 async function applyGroupsByNative(groups, validTabIds, windowId) {
