@@ -32,6 +32,7 @@
     "48": "icons/icon-48.svg",
     "96": "icons/icon-96.svg"
   },
+  "content_security_policy": "script-src 'self'; object-src 'none'; connect-src https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com http://localhost:*;",
   "browser_specific_settings": {
     "gecko": {
       "id": "hayatab@hayase.moe",

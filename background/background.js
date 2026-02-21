@@ -184,8 +184,8 @@ async function callAPI(provider, settings, tabData) {
     }
     case "gemini": {
       const m = model || "gemini-2.0-flash";
-      url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
-      headers = { "Content-Type": "application/json" };
+      url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+      headers = { "Content-Type": "application/json", "x-goog-api-key": apiKey };
       body = {
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
@@ -194,7 +194,17 @@ async function callAPI(provider, settings, tabData) {
       break;
     }
     case "ollama": {
-      const base = (ollamaUrl || "http://localhost:11434").replace(/\/$/, "");
+      const rawUrl = ollamaUrl || "http://localhost:11434";
+      let parsedBase;
+      try {
+        parsedBase = new URL(rawUrl);
+      } catch {
+        throw new Error("Invalid Ollama URL in settings.");
+      }
+      if (parsedBase.hostname !== "localhost" && parsedBase.hostname !== "127.0.0.1") {
+        throw new Error("Ollama URL must be localhost.");
+      }
+      const base = rawUrl.replace(/\/$/, "");
       url = `${base}/api/chat`;
       headers = { "Content-Type": "application/json" };
       body = {
@@ -239,14 +249,14 @@ async function callAPI(provider, settings, tabData) {
   if (!res.ok) {
     if (res.status === 401) throw new Error("Invalid API key. Check Settings.");
     if (res.status === 429) throw new Error("Rate limited by provider. Wait a moment and try again.");
-    // Try JSON first (Claude/OpenAI/Gemini), fall back to plain text (Ollama)
+    // Try JSON first (Claude/OpenAI/Gemini), fall back to generic message
     const errText = await res.text().catch(() => "");
     let errMsg = `API error (${res.status})`;
     try {
       const errJson = JSON.parse(errText);
       errMsg = errJson.error?.message || errJson.message || errMsg;
     } catch {
-      if (errText) errMsg = errText.slice(0, 200);
+      // Don't surface raw body - use generic message
     }
     throw new Error(errMsg);
   }
@@ -292,6 +302,8 @@ function parseAndValidateGroups(text, allTabIds) {
 
   const assignedIds = new Set();
   for (const group of parsed.groups) {
+    // Validate and sanitize name
+    group.name = String(group.name || "Group").slice(0, 50);
     // Validate color
     if (!validColors.has(group.color)) group.color = "grey";
     // Filter out invalid tab IDs and deduplicate across groups
