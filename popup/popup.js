@@ -23,6 +23,27 @@ function clearChildren(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+function formatRelativeTime(timestamp) {
+  const diffMs = Date.now() - timestamp;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin === 1) return "1 min ago";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr === 1) return "1 hr ago";
+  return `${diffHr} hr ago`;
+}
+
+function showStaleIndicator(timestamp) {
+  const el = document.getElementById("stale-indicator");
+  el.textContent = `From previous analysis · ${formatRelativeTime(timestamp)}`;
+  el.classList.remove("hidden");
+}
+
+function hideStaleIndicator() {
+  document.getElementById("stale-indicator").classList.add("hidden");
+}
+
 const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", ollama: "Ollama" };
 
 function formatModelName(model) {
@@ -62,7 +83,14 @@ async function init() {
   document.getElementById("provider-label").textContent =
     modelName ? `${providerName} \u00B7 ${modelName}` : providerName;
 
-  showView("ready");
+  const pending = await browser.runtime.sendMessage({ action: "getPendingGroups" });
+  if (pending.ok && pending.groups) {
+    renderGroups(pending.groups);
+    showStaleIndicator(pending.timestamp);
+    showView("results");
+  } else {
+    showView("ready");
+  }
 }
 
 async function analyzeTabs() {
@@ -76,6 +104,7 @@ async function analyzeTabs() {
     }
     currentGroups = response.groups;
     renderGroups(currentGroups);
+    hideStaleIndicator();
     showView("results");
   } catch (err) {
     showError(err.message || "Something went wrong.");
