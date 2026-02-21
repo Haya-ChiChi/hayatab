@@ -362,7 +362,11 @@ function parseAndValidateGroups(text, allTabIds) {
   const assignedIds = new Set();
   for (const group of parsed.groups) {
     // Validate and sanitize name
-    group.name = String(group.name || "Group").slice(0, 50);
+    group.name = String(group.name || "Group")
+      .replace(/[^\w\s\-'&]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 50) || "Group";
     // Validate color
     if (!validColors.has(group.color)) group.color = "grey";
     // Filter out invalid tab IDs and deduplicate across groups
