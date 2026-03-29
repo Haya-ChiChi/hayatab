@@ -308,6 +308,7 @@ async function callAPI(provider, settings, tabData) {
   if (!res.ok) {
     if (res.status === 401) throw new Error("Invalid API key. Check Settings.");
     if (res.status === 429) throw new Error("Rate limited by provider. Wait a moment and try again.");
+    if (res.status === 529) throw new Error("AI provider is overloaded. Try again in a few seconds.");
     // Try JSON first (Claude/OpenAI/Gemini), fall back to generic message
     const errText = await res.text().catch(() => "");
     let errMsg = `API error (${res.status})`;

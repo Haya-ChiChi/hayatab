@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!--
+    Hayatab logo: 5 colored tab cards fanning from bottom center.
+    Draw order = back to front (SVG paints last element on top).
+    Rotation center: (64, 115) — near bottom of canvas.
+    Each card: 36×58px body + 14×13px ear at top-left.
+    Colors represent distinct tab groups.
+  -->
+
+  <!-- Purple — far left, -20° -->
+  <g transform="rotate(-20, 64, 115)">
+    <rect x="46" y="35" width="36" height="58" rx="6" fill="#8E44AD"/>
+    <rect x="46" y="24" width="14" height="13" rx="3" fill="#8E44AD"/>
+  </g>
+
+  <!-- Red — far right, +20° -->
+  <g transform="rotate(20, 64, 115)">
+    <rect x="46" y="35" width="36" height="58" rx="6" fill="#E74C3C"/>
+    <rect x="46" y="24" width="14" height="13" rx="3" fill="#E74C3C"/>
+  </g>
+
+  <!-- Blue — second left, -10° -->
+  <g transform="rotate(-10, 64, 115)">
+    <rect x="46" y="35" width="36" height="58" rx="6" fill="#2980B9"/>
+    <rect x="46" y="24" width="14" height="13" rx="3" fill="#2980B9"/>
+  </g>
+
+  <!-- Orange — second right, +10° -->
+  <g transform="rotate(10, 64, 115)">
+    <rect x="46" y="35" width="36" height="58" rx="6" fill="#E67E22"/>
+    <rect x="46" y="24" width="14" height="13" rx="3" fill="#E67E22"/>
+  </g>
+
+  <!-- Green — center front, 0° -->
+  <g transform="rotate(0, 64, 115)">
+    <rect x="46" y="35" width="36" height="58" rx="6" fill="#27AE60"/>
+    <rect x="46" y="24" width="14" height="13" rx="3" fill="#27AE60"/>
+  </g>
+</svg>
