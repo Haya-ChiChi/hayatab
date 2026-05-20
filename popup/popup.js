@@ -150,10 +150,11 @@ function renderGroups(groups) {
       li.className = "tab-item";
       li.title = tab.url || "";
 
-      if (tab.favIconUrl) {
+      const safeIconUrl = tab.favIconUrl && /^https?:\/\//i.test(tab.favIconUrl) ? tab.favIconUrl : null;
+      if (safeIconUrl) {
         const icon = document.createElement("img");
         icon.className = "tab-favicon";
-        icon.src = tab.favIconUrl;
+        icon.src = safeIconUrl;
         icon.width = 14;
         icon.height = 14;
         icon.onerror = () => icon.remove();
