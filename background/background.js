@@ -188,13 +188,34 @@ function sanitizeTabData(tabs) {
     "api key", "secret", "password", "credentials", "exfiltrate",
     "upload", "send to",
   ];
-  const IMPERATIVE_VERBS = /^(look|find|get|fetch|read|send|upload|download|extract|output|return|write|list|show|print|dump|ignore|forget)\b/i;
+  // For titles: verb must appear at the start (reduces false positives on free-form text)
+  const TITLE_VERB_RE = /^(look|find|get|fetch|read|send|upload|download|extract|output|return|write|list|show|print|dump|ignore|forget)\b/i;
+  // For URL path/query/hash: verb can appear anywhere (URLs have a fixed scheme+host prefix)
+  const URL_VERB_RE = /\b(look|find|get|fetch|read|send|upload|download|extract|output|return|write|list|show|print|dump|ignore|forget)\b/i;
 
-  function checkAndFilter(text) {
+  function hasBlocklistTerm(text) {
     const lower = text.toLowerCase();
-    const hasBlocklistTerm = BLOCKLIST.some((term) => lower.includes(term));
-    const startsWithVerb = IMPERATIVE_VERBS.test(text);
-    return hasBlocklistTerm && startsWithVerb;
+    return BLOCKLIST.some((term) => lower.includes(term));
+  }
+
+  function checkTitle(text) {
+    return hasBlocklistTerm(text) && TITLE_VERB_RE.test(text);
+  }
+
+  function checkUrl(urlStr) {
+    // Extract path+search+hash so the scheme/host prefix doesn't mask verb detection
+    let meaningful = urlStr;
+    try {
+      const parsed = new URL(urlStr);
+      meaningful = decodeURIComponent(parsed.pathname + parsed.search + parsed.hash);
+    } catch {
+      try {
+        meaningful = decodeURIComponent(urlStr);
+      } catch {
+        // leave as-is
+      }
+    }
+    return hasBlocklistTerm(meaningful) && URL_VERB_RE.test(meaningful);
   }
 
   let filtered = 0;
@@ -203,25 +224,15 @@ function sanitizeTabData(tabs) {
       .replace(/[\x00-\x1f\x7f]/g, "")
       .slice(0, 200);
 
-    if (checkAndFilter(title)) {
+    if (checkTitle(title)) {
       filtered++;
       title = "[content filtered]";
     }
 
-    // Also check URL for injections (decode first to catch encoded attempts)
     let url = t.url || "";
-    try {
-      const decoded = decodeURIComponent(url);
-      if (checkAndFilter(decoded) || checkAndFilter(url)) {
-        filtered++;
-        url = "[url filtered]";
-      }
-    } catch {
-      // malformed percent-encoding — keep raw url for filtering check
-      if (checkAndFilter(url)) {
-        filtered++;
-        url = "[url filtered]";
-      }
+    if (checkUrl(url)) {
+      filtered++;
+      url = "[url filtered]";
     }
 
     return { ...t, title, url };
