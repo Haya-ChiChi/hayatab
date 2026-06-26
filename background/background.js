@@ -35,6 +35,7 @@ const handlers = {
   analyzeTabs: handleAnalyzeTabs,
   applyGroups: handleApplyGroups,
   getPendingGroups: handleGetPendingGroups,
+  listModels: handleListModels,
 };
 
 browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -125,6 +126,167 @@ async function handleApplyGroups({ groups }) {
 
 async function handleGetPendingGroups() {
   return { ok: true, groups: pendingGroups, timestamp: pendingTimestamp };
+}
+
+// --- Live model listing ---
+
+const MODEL_LIST_TIMEOUT_MS = 10_000;
+const MODEL_LIST_MAX_PAGES = 20;
+// Allow word chars, dot, dash, and colon (Ollama tags like "llama3.2:latest").
+// Excludes slashes/spaces so a value can't smuggle a URL path or whitespace.
+const VALID_MODEL_ID_RE = /^[\w.:\-]+$/;
+// OpenAI's /models returns embeddings, audio, image, etc. alongside chat models.
+// Filter by *exclusion* of known non-chat families so future renames survive.
+const OPENAI_NON_CHAT_MARKERS = [
+  "embedding", "whisper", "tts", "audio", "realtime",
+  "image", "dall-e", "moderation", "transcribe",
+];
+
+// Each descriptor's parse(json) MUST validate the response shape and throw on
+// anything unexpected — it must never coerce an unrecognized schema into []
+// (e.g. `json.data ?? []`). That way a 200 OK whose schema changed cleanly falls
+// back to the cached/hardcoded list instead of silently caching an empty result.
+const MODEL_PROVIDERS = {
+  claude: {
+    getRequest: (s) => ({
+      url: "https://api.anthropic.com/v1/models?limit=1000",
+      headers: {
+        "x-api-key": s.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+    }),
+    parse(json) {
+      if (!json || !Array.isArray(json.data)) throw new Error("Unexpected Claude /models schema");
+      return json.data.map((m) => ({ value: m.id, label: m.display_name || m.id }));
+    },
+  },
+  openai: {
+    getRequest: (s) => ({
+      url: "https://api.openai.com/v1/models",
+      headers: { Authorization: `Bearer ${s.apiKey}` },
+    }),
+    parse(json) {
+      if (!json || !Array.isArray(json.data)) throw new Error("Unexpected OpenAI /models schema");
+      return json.data
+        .filter((m) => {
+          const id = String(m.id || "").toLowerCase();
+          return !OPENAI_NON_CHAT_MARKERS.some((marker) => id.includes(marker));
+        })
+        .map((m) => ({ value: m.id, label: m.id }));
+    },
+  },
+  gemini: {
+    getRequest: (s) => ({
+      url: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+      headers: { "x-goog-api-key": s.apiKey },
+    }),
+    // Gemini paginates; follow nextPageToken until it's absent.
+    nextToken: (json) => json && json.nextPageToken,
+    pageUrl: (s, token) =>
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&pageToken=${encodeURIComponent(token)}`,
+    headersFor: (s) => ({ "x-goog-api-key": s.apiKey }),
+    parse(json) {
+      if (!json || !Array.isArray(json.models)) throw new Error("Unexpected Gemini /models schema");
+      return json.models
+        .filter((m) => Array.isArray(m.supportedGenerationMethods)
+          && m.supportedGenerationMethods.includes("generateContent"))
+        .map((m) => {
+          const value = String(m.name || "").replace(/^models\//, "");
+          return { value, label: m.displayName || value };
+        });
+    },
+  },
+  ollama: {
+    getRequest: (s) => ({
+      url: `${s.ollamaUrl.replace(/\/$/, "")}/api/tags`,
+      headers: {},
+    }),
+    parse(json) {
+      if (!json || !Array.isArray(json.models)) throw new Error("Unexpected Ollama /api/tags schema");
+      return json.models.map((m) => ({ value: m.name, label: m.name }));
+    },
+  },
+};
+
+async function fetchModelJson(url, headers) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_LIST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, { method: "GET", headers, signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out.");
+    throw new Error(`Network error: ${err.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  // Treat any non-2xx as failure BEFORE attempting to parse the body.
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Invalid API key.");
+    if (res.status === 429) throw new Error("Rate limited by provider.");
+    throw new Error(`API error (${res.status})`);
+  }
+  try {
+    return await res.json();
+  } catch {
+    throw new Error("Provider returned invalid JSON.");
+  }
+}
+
+async function handleListModels({ provider }) {
+  const descriptor = MODEL_PROVIDERS[provider];
+  if (!descriptor) return { ok: false, error: `Unknown provider: ${provider}` };
+
+  const settings = await browser.storage.local.get([
+    "ollamaUrl", "apiKey_claude", "apiKey_openai", "apiKey_gemini",
+  ]);
+  const keyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
+  const apiKey = settings[keyMap[provider]] || "";
+
+  // Missing credentials are an expected state, not a failure.
+  if (provider === "ollama") {
+    if (!settings.ollamaUrl) return { ok: false, reason: "no_key" };
+    // Reuse the existing localhost-only validation; do NOT accept other hosts.
+    try {
+      const parsed = new URL(settings.ollamaUrl);
+      if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        return { ok: false, error: "Ollama URL must be localhost." };
+      }
+    } catch {
+      return { ok: false, error: "Invalid Ollama URL." };
+    }
+  } else if (!apiKey) {
+    return { ok: false, reason: "no_key" };
+  }
+
+  try {
+    const reqSettings = { apiKey, ollamaUrl: settings.ollamaUrl };
+    let { url, headers } = descriptor.getRequest(reqSettings);
+    const seen = new Map(); // dedupe by value, preserving provider response order
+    let pages = 0;
+
+    while (url && pages < MODEL_LIST_MAX_PAGES) {
+      pages++;
+      const json = await fetchModelJson(url, headers);
+      const models = descriptor.parse(json); // validates schema, throws on mismatch
+      for (const m of models) {
+        if (!m || !m.value || !VALID_MODEL_ID_RE.test(m.value)) continue; // drop bad ids, don't fail
+        if (!seen.has(m.value)) seen.set(m.value, { value: m.value, label: m.label || m.value });
+      }
+      const token = descriptor.nextToken ? descriptor.nextToken(json) : undefined;
+      url = token ? descriptor.pageUrl(reqSettings, token) : undefined;
+      if (url && descriptor.headersFor) headers = descriptor.headersFor(reqSettings);
+    }
+
+    const list = Array.from(seen.values());
+    // An empty normalized list means "schema we don't understand" or a provider
+    // hiccup — treat as a failed refresh so the UI keeps its existing list.
+    if (list.length === 0) return { ok: false, error: "Provider returned no usable models." };
+    return { ok: true, models: list };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
 
 async function applyGroupsByNative(groups, validTabIds, windowId) {
