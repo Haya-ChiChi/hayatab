@@ -112,11 +112,13 @@ async function handleApplyGroups({ groups }) {
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
+  const { collapseGroups } = await browser.storage.local.get("collapseGroups");
+
   let result;
   if (IS_ZEN) {
     result = await applyGroupsBySort(groups, validTabIds);
   } else {
-    result = await applyGroupsByNative(groups, validTabIds, windowId);
+    result = await applyGroupsByNative(groups, validTabIds, windowId, collapseGroups === true);
   }
 
   pendingGroups = null;
@@ -289,7 +291,7 @@ async function handleListModels({ provider }) {
   }
 }
 
-async function applyGroupsByNative(groups, validTabIds, windowId) {
+async function applyGroupsByNative(groups, validTabIds, windowId, collapse = false) {
   let applied = 0;
   for (const group of groups) {
     const validIds = group.tabIds.filter((id) => validTabIds.has(id));
@@ -305,6 +307,7 @@ async function applyGroupsByNative(groups, validTabIds, windowId) {
         await browser.tabGroups.update(groupId, {
           title: group.name,
           color: group.color,
+          collapsed: collapse,
         });
       }
       applied++;

@@ -60,7 +60,7 @@ for (const p of Object.keys(PROVIDERS)) {
 }
 // All storage keys read on load / after save.
 const SETTINGS_FIELDS = [
-  "provider", "cooldown",
+  "provider", "cooldown", "appearance", "collapseGroups",
   "model_claude", "model_openai", "model_gemini", "model_ollama",
   ...ALL_KEY_FIELDS, ...MODEL_CACHE_FIELDS,
 ];
@@ -72,11 +72,15 @@ const providerConfig = document.getElementById("provider-config");
 const cooldownSelect = document.getElementById("cooldown");
 const btnSave = document.getElementById("btn-save");
 const statusEl = document.getElementById("status");
+const appearanceSeg = document.getElementById("appearance-seg");
+const groupstateSeg = document.getElementById("groupstate-seg");
 
 let activeProvider = "claude";  // tab currently being viewed/edited
 let savedProvider = "claude";   // provider actually in use (from storage)
 let currentModelChangeListener = null;
 let allSavedData = {};
+let appearanceValue = "system"; // light | dark | system
+let collapseGroups = false;     // After Applying: false = expanded, true = collapsed
 
 function maskKey(key) {
   if (!key || key.length < 12) return "****";
@@ -112,7 +116,44 @@ function clearChildren(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+// ── Theme (Light / Dark / System) ──
+function applyAppearance(value) {
+  const root = document.documentElement;
+  if (value === "light" || value === "dark") {
+    root.setAttribute("data-theme", value);
+  } else {
+    root.removeAttribute("data-theme");
+  }
+}
+
+// ── Segmented controls ──
+function setActiveSeg(container, matchFn) {
+  container.querySelectorAll(".seg").forEach((seg) => {
+    seg.classList.toggle("active", matchFn(seg));
+  });
+}
+
+function setupSegments() {
+  appearanceSeg.addEventListener("click", (e) => {
+    const btn = e.target.closest(".seg");
+    if (!btn) return;
+    appearanceValue = btn.dataset.appearance;
+    setActiveSeg(appearanceSeg, (s) => s.dataset.appearance === appearanceValue);
+    applyAppearance(appearanceValue); // live preview
+  });
+
+  groupstateSeg.addEventListener("click", (e) => {
+    const btn = e.target.closest(".seg");
+    if (!btn) return;
+    collapseGroups = btn.dataset.collapsed === "true";
+    setActiveSeg(groupstateSeg, (s) => (s.dataset.collapsed === "true") === collapseGroups);
+  });
+}
+
 // --- Model list (live fetch with hardcoded fallback) ---
+
+const REFRESH_ICON =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
 
 function isModelCacheFresh(provider) {
   const time = allSavedData["cachedModelsTime_" + provider];
@@ -272,7 +313,7 @@ function renderProviderConfig() {
 
   clearChildren(providerConfig);
 
-  // Model dropdown
+  // Model field (dropdown + refresh button)
   const modelField = document.createElement("div");
   modelField.className = "field";
 
@@ -282,7 +323,7 @@ function renderProviderConfig() {
   modelField.appendChild(modelLabel);
 
   const modelRow = document.createElement("div");
-  modelRow.className = "model-select-row";
+  modelRow.className = "model-row";
 
   const modelSelect = document.createElement("select");
   modelSelect.id = "model";
@@ -291,10 +332,11 @@ function renderProviderConfig() {
 
   const refreshBtn = document.createElement("button");
   refreshBtn.type = "button";
-  refreshBtn.className = "btn-icon";
+  refreshBtn.className = "btn-refresh";
+  refreshBtn.id = "btn-refresh-models";
   refreshBtn.title = "Fetch the latest models from the provider";
   refreshBtn.setAttribute("aria-label", "Refresh model list");
-  refreshBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.89M13.5 1.5v3.5h-3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  refreshBtn.innerHTML = REFRESH_ICON;
   refreshBtn.addEventListener("click", async () => {
     refreshBtn.disabled = true;
     refreshBtn.classList.add("spinning");
@@ -303,9 +345,8 @@ function renderProviderConfig() {
     refreshBtn.classList.remove("spinning");
   });
   modelRow.appendChild(refreshBtn);
-  modelField.appendChild(modelRow);
 
-  modelField.appendChild(modelSelect);
+  modelField.appendChild(modelRow);
   providerConfig.appendChild(modelField);
 
   // Auto-refresh from the provider when the cached list is stale.
@@ -394,6 +435,15 @@ async function loadSettings() {
   activeProvider = savedProvider;
   cooldownSelect.value = String(allSavedData.cooldown || 10000);
 
+  // Appearance
+  appearanceValue = allSavedData.appearance || "system";
+  applyAppearance(appearanceValue);
+  setActiveSeg(appearanceSeg, (s) => s.dataset.appearance === appearanceValue);
+
+  // After Applying (collapse)
+  collapseGroups = allSavedData.collapseGroups === true;
+  setActiveSeg(groupstateSeg, (s) => (s.dataset.collapsed === "true") === collapseGroups);
+
   // Migration: move old shared `apiKey` to the active provider's key
   const oldData = await browser.storage.local.get(["apiKey", "model"]);
   if (oldData.apiKey) {
@@ -420,6 +470,8 @@ btnSave.addEventListener("click", async () => {
   const toSave = {
     provider: activeProvider,
     cooldown: parseInt(cooldownSelect.value, 10),
+    appearance: appearanceValue,
+    collapseGroups: collapseGroups,
   };
 
   // Resolve model
@@ -477,7 +529,8 @@ btnSave.addEventListener("click", async () => {
   allSavedData = await browser.storage.local.get(SETTINGS_FIELDS);
   renderProviderTabs();
   renderProviderConfig();
-  showStatus("Saved!", "success");
+  showStatus("Saved", "success");
 });
 
+setupSegments();
 loadSettings();

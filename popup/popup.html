@@ -5,47 +5,98 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <!-- No API Key -->
+  <!-- No Provider -->
   <div id="view-no-key" class="view hidden">
+    <div class="topbar">
+      <div class="brand">
+        <img src="../logo.svg" alt="" width="18" height="18" />
+        <span class="wordmark">Hayatab</span>
+      </div>
+    </div>
     <div class="center-content">
-      <p class="message">No AI provider configured.</p>
-      <button id="btn-open-options" class="btn btn-primary">Open Settings</button>
+      <div class="icon-badge accent">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </div>
+      <p class="state-title">No provider configured</p>
+      <p class="message">Choose an AI provider and add a key to start organizing your tabs.</p>
+      <button id="btn-open-options" class="btn btn-primary btn-block state-action">Open Settings</button>
     </div>
   </div>
 
   <!-- Ready -->
   <div id="view-ready" class="view hidden">
-    <button id="btn-settings" class="btn-icon" title="Settings">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-        <line x1="2" y1="4" x2="14" y2="4"/>
-        <line x1="2" y1="8" x2="14" y2="8"/>
-        <line x1="2" y1="12" x2="14" y2="12"/>
-        <circle cx="5" cy="4" r="1.5" fill="currentColor" stroke="none"/>
-        <circle cx="10" cy="8" r="1.5" fill="currentColor" stroke="none"/>
-        <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-      </svg>
-    </button>
+    <div class="topbar">
+      <div class="brand">
+        <img src="../logo.svg" alt="" width="18" height="18" />
+        <span class="wordmark">Hayatab</span>
+      </div>
+      <button id="btn-settings" class="btn-icon" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="2" y1="4" x2="14" y2="4"/>
+          <line x1="2" y1="8" x2="14" y2="8"/>
+          <line x1="2" y1="12" x2="14" y2="12"/>
+          <circle cx="5" cy="4" r="1.5" fill="currentColor" stroke="none"/>
+          <circle cx="10" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+          <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+    </div>
     <div class="center-content">
-      <h1 class="title">Hayatab</h1>
-      <p class="subtitle" id="tab-count"></p>
-      <p class="provider-label" id="provider-label"></p>
-      <button id="btn-analyze" class="btn btn-primary">Analyze Tabs</button>
+      <div class="ready-bars" aria-hidden="true">
+        <span style="height:14px; background:var(--color-blue);"></span>
+        <span style="height:22px; background:var(--color-pink);"></span>
+        <span style="height:9px;  background:var(--color-green);"></span>
+        <span style="height:18px; background:var(--color-orange);"></span>
+        <span style="height:25px; background:var(--color-purple);"></span>
+        <span style="height:12px; background:var(--color-cyan);"></span>
+        <span style="height:20px; background:var(--color-red);"></span>
+        <span style="height:16px; background:var(--color-yellow);"></span>
+        <span style="height:24px; background:var(--color-blue);"></span>
+        <span style="height:10px; background:var(--color-pink);"></span>
+        <span style="height:19px; background:var(--color-green);"></span>
+        <span style="height:14px; background:var(--color-purple);"></span>
+        <span style="height:22px; background:var(--color-orange);"></span>
+        <span style="height:11px; background:var(--color-cyan);"></span>
+      </div>
+      <div class="count-num" id="tab-count">0</div>
+      <div class="count-label">Tabs Open</div>
+      <button id="btn-analyze" class="btn btn-primary btn-block ready-action">Analyze Tabs</button>
+      <div class="provider-chip">
+        <span class="dot"></span>
+        <span class="provider-label" id="provider-label"></span>
+      </div>
     </div>
   </div>
 
   <!-- Loading -->
   <div id="view-loading" class="view hidden">
+    <div class="topbar">
+      <div class="brand">
+        <img src="../logo.svg" alt="" width="18" height="18" />
+        <span class="wordmark">Hayatab</span>
+      </div>
+    </div>
     <div class="center-content">
-      <div class="spinner"></div>
-      <p class="message">Analyzing your tabs...</p>
+      <div class="sort-list" id="sort-list" aria-hidden="true">
+        <div class="sort-row" data-pos="0" style="top:0px;  background:var(--color-blue);"><div class="inner"><span class="dot"></span><span class="line" style="width:72px;"></span></div></div>
+        <div class="sort-row" data-pos="1" style="top:22px; background:var(--color-cyan);"><div class="inner"><span class="dot"></span><span class="line" style="width:50px;"></span></div></div>
+        <div class="sort-row" data-pos="2" style="top:44px; background:var(--color-orange);"><div class="inner"><span class="dot"></span><span class="line" style="width:84px;"></span></div></div>
+        <div class="sort-row" data-pos="3" style="top:66px; background:var(--color-purple);"><div class="inner"><span class="dot"></span><span class="line" style="width:60px;"></span></div></div>
+        <div class="sort-row" data-pos="4" style="top:88px; background:var(--color-pink);"><div class="inner"><span class="dot"></span><span class="line" style="width:44px;"></span></div></div>
+      </div>
+      <p class="loading-title message">Analyzing your tabs…</p>
+      <p class="loading-sub" id="loading-sub"></p>
     </div>
   </div>
 
   <!-- Results -->
   <div id="view-results" class="view hidden">
     <div class="results-header">
-      <h2 class="results-title">Suggested Groups</h2>
-      <p id="stale-indicator" class="stale-indicator hidden"></p>
+      <div>
+        <div class="results-title">Suggested Groups</div>
+        <p id="stale-indicator" class="stale-indicator hidden"></p>
+      </div>
+      <span class="group-count-total" id="group-count-total"></span>
     </div>
     <div id="groups-list"></div>
     <div class="action-row">
@@ -56,20 +107,36 @@
 
   <!-- Error -->
   <div id="view-error" class="view hidden">
+    <div class="topbar">
+      <div class="brand">
+        <img src="../logo.svg" alt="" width="18" height="18" />
+        <span class="wordmark">Hayatab</span>
+      </div>
+    </div>
     <div class="center-content">
-      <p class="message error-text" id="error-message"></p>
-      <button id="btn-retry" class="btn btn-primary">Try Again</button>
+      <div class="icon-badge danger">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <p class="error-text" id="error-message"></p>
+      <button id="btn-retry" class="btn btn-primary btn-block state-action">Try Again</button>
     </div>
   </div>
 
   <!-- Done -->
   <div id="view-done" class="view hidden">
+    <div class="topbar">
+      <div class="brand">
+        <img src="../logo.svg" alt="" width="18" height="18" />
+        <span class="wordmark">Hayatab</span>
+      </div>
+    </div>
     <div class="center-content">
-      <svg class="checkmark-svg" viewBox="0 0 52 52" width="48" height="48">
+      <svg class="checkmark-svg" viewBox="0 0 52 52" width="52" height="52">
         <circle class="checkmark-circle" cx="26" cy="26" r="23" fill="none" stroke-width="3"/>
         <path class="checkmark-path" d="M15 26l7 8 15-16" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <p class="message done-text">Tabs organized!</p>
+      <p class="done-text">Tabs organized!</p>
+      <p class="done-summary" id="done-summary"></p>
     </div>
   </div>
 
