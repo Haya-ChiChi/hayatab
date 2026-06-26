@@ -276,32 +276,34 @@ function renderProviderConfig() {
   const modelField = document.createElement("div");
   modelField.className = "field";
 
-  const modelHeader = document.createElement("div");
-  modelHeader.className = "model-label-row";
-
   const modelLabel = document.createElement("label");
   modelLabel.setAttribute("for", "model");
   modelLabel.textContent = "Model";
-  modelHeader.appendChild(modelLabel);
+  modelField.appendChild(modelLabel);
 
-  const refreshBtn = document.createElement("button");
-  refreshBtn.type = "button";
-  refreshBtn.className = "btn btn-secondary btn-sm";
-  refreshBtn.textContent = "Refresh";
-  refreshBtn.title = "Fetch the latest models from the provider";
-  refreshBtn.addEventListener("click", async () => {
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = "Refreshing…";
-    await refreshModels(activeProvider);
-    refreshBtn.disabled = false;
-    refreshBtn.textContent = "Refresh";
-  });
-  modelHeader.appendChild(refreshBtn);
-  modelField.appendChild(modelHeader);
+  const modelRow = document.createElement("div");
+  modelRow.className = "model-select-row";
 
   const modelSelect = document.createElement("select");
   modelSelect.id = "model";
   fillModelSelect(modelSelect, activeProvider);
+  modelRow.appendChild(modelSelect);
+
+  const refreshBtn = document.createElement("button");
+  refreshBtn.type = "button";
+  refreshBtn.className = "btn-icon";
+  refreshBtn.title = "Fetch the latest models from the provider";
+  refreshBtn.setAttribute("aria-label", "Refresh model list");
+  refreshBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.89M13.5 1.5v3.5h-3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add("spinning");
+    await refreshModels(activeProvider);
+    refreshBtn.disabled = false;
+    refreshBtn.classList.remove("spinning");
+  });
+  modelRow.appendChild(refreshBtn);
+  modelField.appendChild(modelRow);
 
   modelField.appendChild(modelSelect);
   providerConfig.appendChild(modelField);

@@ -187,15 +187,55 @@ h1 {
   margin-bottom: 16px;
 }
 
-.model-label-row {
+.model-select-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
-.model-label-row label {
-  margin-bottom: 0;
+.model-select-row select {
+  flex: 1;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.btn-icon:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.btn-icon:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.btn-icon.spinning svg {
+  animation: btnIconSpin 0.8s linear infinite;
+}
+
+@keyframes btnIconSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon.spinning svg {
+    animation: none;
+  }
 }
 
 label {
