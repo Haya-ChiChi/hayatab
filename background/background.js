@@ -171,15 +171,18 @@ async function applyGroupsBySort(groups, validTabIds) {
   const pinnedCount = pinnedTabs.length;
 
   // Move tabs one by one to their target positions
+  let moved = 0;
   for (let i = 0; i < sortedIds.length; i++) {
     try {
       await browser.tabs.move(sortedIds[i], { index: pinnedCount + i });
+      moved++;
     } catch (err) {
       console.warn(`Failed to move tab ${sortedIds[i]}:`, err);
     }
   }
 
-  return { ok: true, sortedOnly: true };
+  if (moved === 0) throw new Error("No tabs could be sorted. Try re-analyzing.");
+  return { ok: true, sortedOnly: true, moved, total: sortedIds.length };
 }
 
 function sanitizeTabData(tabs) {
