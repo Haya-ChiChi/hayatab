@@ -13,6 +13,7 @@ When you click "Analyze Tabs", the extension sends **tab titles and URLs** from 
 - **Claude** (Anthropic) - api.anthropic.com
 - **OpenAI** - api.openai.com
 - **Gemini** (Google) - generativelanguage.googleapis.com
+- **Z.AI** - api.z.ai
 - **Ollama** (Local) - localhost only, no data leaves your machine
 
 No other data is sent. The extension does not transmit browsing history, cookies, passwords, bookmarks, or any personal information beyond tab titles and URLs.
