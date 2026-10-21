@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FB7185"/>
+      <stop offset="1" stop-color="#BE123C"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="30" fill="url(#tile)"/>
+  <rect x="6" y="6" width="116" height="116" rx="30" fill="url(#shine)"/>
+  <rect x="7" y="7" width="114" height="114" rx="29" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2"/>
+  <g transform="translate(16 0) skewX(-16)">
+    <g fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round">
+      <line x1="46" y1="36" x2="96" y2="36"/>
+      <line x1="42" y1="60" x2="86" y2="60" stroke-opacity=".92"/>
+      <path d="M34 88 Q62 104 98 80"/>
+    </g>
+    <path d="M71 95.5 L89 90.5 Q88.5 104 81.5 114 Q76.5 104.5 71 95.5 Z" fill="#fff"/>
+    <circle cx="46" cy="36" r="6.5" fill="#F59E0B"/>
+    <circle cx="42" cy="60" r="6.5" fill="#EC4899"/>
+    <circle cx="34" cy="88" r="6.5" fill="#22D3EE"/>
+  </g>
+</svg>
