@@ -2,9 +2,8 @@ const PROVIDERS = {
   claude: {
     label: "Claude",
     models: [
-      { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5 (cheapest)" },
-      { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
-      { value: "claude-opus-4-6", label: "Opus 4.6 (most capable)" },
+      { value: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)" },
+      { value: "claude-sonnet-5-5", label: "Sonnet 5.5 (most capable)" },
     ],
     credentialType: "apiKey",
     keyPlaceholder: "sk-ant-...",
@@ -14,9 +13,8 @@ const PROVIDERS = {
   openai: {
     label: "OpenAI",
     models: [
-      { value: "gpt-4o-mini", label: "GPT-4o mini (cheapest)" },
-      { value: "gpt-4o", label: "GPT-4o" },
-      { value: "o3-mini", label: "o3-mini" },
+      { value: "gpt-5.6-luna", label: "GPT-5.6 Luna (cheapest)" },
+      { value: "gpt-5.6-sol", label: "GPT-5.6 Sol (most capable)" },
     ],
     credentialType: "apiKey",
     keyPlaceholder: "sk-...",
@@ -26,9 +24,8 @@ const PROVIDERS = {
   gemini: {
     label: "Gemini",
     models: [
-      { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash (cheapest)" },
-      { value: "gemini-2.5-flash-preview-05-20", label: "Gemini 2.5 Flash" },
-      { value: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro" },
+      { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (cheapest)" },
+      { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash (most capable)" },
     ],
     credentialType: "apiKey",
     keyPlaceholder: "AIza...",
@@ -61,7 +58,6 @@ const statusEl = document.getElementById("status");
 
 let activeProvider = "claude";  // tab currently being viewed/edited
 let savedProvider = "claude";   // provider actually in use (from storage)
-let currentModelChangeListener = null;
 let allSavedData = {};
 
 function maskKey(key) {
@@ -94,14 +90,10 @@ function createField(labelText, inputType, inputId, placeholder) {
   return field;
 }
 
-function clearChildren(el) {
-  while (el.firstChild) el.removeChild(el.firstChild);
-}
-
 // --- Provider tabs ---
 
 function renderProviderTabs() {
-  clearChildren(providerTabs);
+  providerTabs.replaceChildren();
   for (const [id, config] of Object.entries(PROVIDERS)) {
     const isViewing = id === activeProvider;
     const isInUse = id === savedProvider;
@@ -142,11 +134,7 @@ function renderProviderTabs() {
 }
 
 function isProviderConfigured(providerId) {
-  const config = PROVIDERS[providerId];
-  if (config.credentialType === "ollama") {
-    return !!allSavedData.ollamaUrl;
-  }
-  return !!allSavedData[config.storageKey];
+  return !!allSavedData[PROVIDERS[providerId].storageKey];
 }
 
 // --- Provider config panel ---
@@ -154,14 +142,7 @@ function isProviderConfigured(providerId) {
 function renderProviderConfig() {
   const config = PROVIDERS[activeProvider];
 
-  // Remove stale listener
-  if (currentModelChangeListener) {
-    const modelEl = document.getElementById("model");
-    if (modelEl) modelEl.removeEventListener("change", currentModelChangeListener);
-    currentModelChangeListener = null;
-  }
-
-  clearChildren(providerConfig);
+  providerConfig.replaceChildren();
 
   // Model dropdown
   const modelField = document.createElement("div");
@@ -221,7 +202,7 @@ function renderProviderConfig() {
       changeBtn.textContent = "Change";
       changeBtn.addEventListener("click", () => {
         // Replace with editable input
-        clearChildren(field);
+        field.replaceChildren();
         const newLabel = document.createElement("label");
         newLabel.setAttribute("for", "api-key");
         newLabel.textContent = config.keyLabel;
@@ -258,7 +239,6 @@ function renderProviderConfig() {
     const updateCustomVisibility = () => {
       customField.style.display = modelSelect.value === "custom" ? "block" : "none";
     };
-    currentModelChangeListener = updateCustomVisibility;
     modelSelect.addEventListener("change", updateCustomVisibility);
     updateCustomVisibility();
 
@@ -280,23 +260,6 @@ async function loadSettings() {
   savedProvider = allSavedData.provider || "claude";
   activeProvider = savedProvider;
   cooldownSelect.value = String(allSavedData.cooldown || 10000);
-
-  // Migration: move old shared `apiKey` to the active provider's key
-  const oldData = await browser.storage.local.get(["apiKey", "model"]);
-  if (oldData.apiKey) {
-    const targetKey = PROVIDERS[activeProvider]?.storageKey;
-    if (targetKey && !allSavedData[targetKey]) {
-      allSavedData[targetKey] = oldData.apiKey;
-      const migration = { [targetKey]: oldData.apiKey };
-      // Also migrate old shared model
-      if (oldData.model) {
-        allSavedData["model_" + activeProvider] = oldData.model;
-        migration["model_" + activeProvider] = oldData.model;
-      }
-      await browser.storage.local.set(migration);
-      await browser.storage.local.remove(["apiKey", "model"]);
-    }
-  }
 
   renderProviderTabs();
   renderProviderConfig();
@@ -325,12 +288,13 @@ btnSave.addEventListener("click", async () => {
 
   // Resolve credentials (per-provider)
   if (config.credentialType === "apiKey") {
-    const keyInput = document.getElementById("api-key");
-    const value = keyInput?.value?.trim();
+    const value = document.getElementById("api-key")?.value.trim();
     if (value) {
       toSave[config.storageKey] = value;
+    } else if (!allSavedData[config.storageKey]) {
+      showStatus("Enter an API key.", "error");
+      return;
     }
-    // If no input visible (masked display), keep existing key
   } else {
     const urlValue = document.getElementById("ollama-url")?.value.trim();
     if (!urlValue) {
@@ -339,7 +303,7 @@ btnSave.addEventListener("click", async () => {
     }
     try {
       const parsed = new URL(urlValue);
-      if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+      if (parsed.hostname !== "localhost") {
         showStatus("Ollama URL must be localhost.", "error");
         return;
       }

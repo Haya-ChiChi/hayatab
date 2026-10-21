@@ -1,6 +1,6 @@
 # Privacy Policy - Hayatab
 
-**Last updated:** 2026-02-17
+**Last updated:** 2026-10-21
 
 ## What This Extension Does
 
@@ -16,8 +16,6 @@ When you click "Analyze Tabs", the extension sends **tab titles and URLs** from 
 - **Ollama** (Local) - localhost only, no data leaves your machine
 
 No other data is sent. The extension does not transmit browsing history, cookies, passwords, bookmarks, or any personal information beyond tab titles and URLs.
-
-**Gemini note:** The Google AI API requires the API key to be included as a URL query parameter. This is a requirement of Google's API design and cannot be avoided when using Gemini.
 
 ## Data Stored Locally
 

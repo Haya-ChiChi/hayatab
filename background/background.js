@@ -26,10 +26,9 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
 }`;
 
 const DEFAULT_COOLDOWN_MS = 10_000;
-const IS_ZEN = navigator.userAgent.includes("Zen/");
+const MAX_OUTPUT_TOKENS = 8192;
 
-let pendingGroups = null;
-let pendingTimestamp = null;
+let pending = null; // last analysis: { groups, timestamp, windowId }
 
 const handlers = {
   analyzeTabs: handleAnalyzeTabs,
@@ -49,21 +48,25 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true; // keep message channel open for async response
 });
 
+// 1.0.1 replaced every listed cloud model; drop saved picks so retired IDs fall back to the new defaults.
+browser.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
+  if (reason === "update" && previousVersion === "1.0.0") {
+    browser.storage.local.remove(["model_claude", "model_openai", "model_gemini"]);
+  }
+});
+
 async function handleAnalyzeTabs() {
   const settings = await browser.storage.local.get([
     "provider", "cooldown", "lastAnalysisTime", "ollamaUrl",
     "model_claude", "model_openai", "model_gemini", "model_ollama",
     "apiKey_claude", "apiKey_openai", "apiKey_gemini",
-    // Legacy fallback
-    "apiKey", "model",
   ]);
 
   const provider = settings.provider || "claude";
 
   // Resolve per-provider API key and model
-  const providerKeyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
-  settings.apiKey = settings[providerKeyMap[provider]] || settings.apiKey || "";
-  settings.model = settings["model_" + provider] || settings.model || "";
+  settings.apiKey = settings["apiKey_" + provider];
+  settings.model = settings["model_" + provider];
 
   // Validate config
   if (provider === "ollama") {
@@ -81,11 +84,14 @@ async function handleAnalyzeTabs() {
   }
   await browser.storage.local.set({ lastAnalysisTime: now });
 
-  const tabs = await browser.tabs.query({ currentWindow: true, pinned: false });
+  const tabs = await browser.tabs.query({ currentWindow: true, pinned: false, hidden: false });
   if (tabs.length === 0) throw new Error("No tabs to organize.");
 
-  const rawTabData = tabs.map((t) => ({ id: t.id, title: t.title, url: t.url }));
-  const tabData = sanitizeTabData(rawTabData);
+  const tabData = tabs.map((t) => ({
+    id: t.id,
+    title: t.title.replace(/[\x00-\x1f\x7f]/g, "").slice(0, 200),
+    url: (t.url || "").slice(0, 500),
+  }));
   const apiResponse = await callAPI(provider, settings, tabData);
   const text = extractText(provider, apiResponse);
   const groups = parseAndValidateGroups(
@@ -99,8 +105,7 @@ async function handleAnalyzeTabs() {
     group.tabs = group.tabIds.map((id) => ({ id, ...tabMap[id] }));
   }
 
-  pendingGroups = groups;
-  pendingTimestamp = Date.now();
+  pending = { groups, timestamp: Date.now(), windowId: tabs[0].windowId };
 
   return { ok: true, groups };
 }
@@ -111,20 +116,15 @@ async function handleApplyGroups({ groups }) {
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
-  let result;
-  if (IS_ZEN) {
-    result = await applyGroupsBySort(groups, validTabIds);
-  } else {
-    result = await applyGroupsByNative(groups, validTabIds, windowId);
-  }
+  const result = await applyGroupsByNative(groups, validTabIds, windowId);
 
-  pendingGroups = null;
-  pendingTimestamp = null;
+  pending = null;
   return result;
 }
 
 async function handleGetPendingGroups() {
-  return { ok: true, groups: pendingGroups, timestamp: pendingTimestamp };
+  const { id } = await browser.windows.getCurrent();
+  return pending?.windowId === id ? { ok: true, ...pending } : { ok: true };
 }
 
 async function applyGroupsByNative(groups, validTabIds, windowId) {
@@ -155,96 +155,6 @@ async function applyGroupsByNative(groups, validTabIds, windowId) {
   return { ok: true };
 }
 
-async function applyGroupsBySort(groups, validTabIds) {
-  // Build the desired tab order: groups in sequence, each group's tabs in original order
-  const sortedIds = [];
-  for (const group of groups) {
-    for (const id of group.tabIds) {
-      if (validTabIds.has(id)) sortedIds.push(id);
-    }
-  }
-
-  if (sortedIds.length === 0) throw new Error("No tabs to sort. Try re-analyzing.");
-
-  // Fresh query for pinned count to avoid stale data
-  const pinnedTabs = await browser.tabs.query({ currentWindow: true, pinned: true });
-  const pinnedCount = pinnedTabs.length;
-
-  // Move tabs one by one to their target positions
-  for (let i = 0; i < sortedIds.length; i++) {
-    try {
-      await browser.tabs.move(sortedIds[i], { index: pinnedCount + i });
-    } catch (err) {
-      console.warn(`Failed to move tab ${sortedIds[i]}:`, err);
-    }
-  }
-
-  return { ok: true, sortedOnly: true };
-}
-
-function sanitizeTabData(tabs) {
-  const BLOCKLIST = [
-    "ignore", "override", "disregard", "forget", "system prompt",
-    "api key", "secret", "password", "credentials", "exfiltrate",
-    "upload", "send to",
-  ];
-  // For titles: verb must appear at the start (reduces false positives on free-form text)
-  const TITLE_VERB_RE = /^(look|find|get|fetch|read|send|upload|download|extract|output|return|write|list|show|print|dump|ignore|forget)\b/i;
-  // For URL path/query/hash: verb can appear anywhere (URLs have a fixed scheme+host prefix)
-  const URL_VERB_RE = /\b(look|find|get|fetch|read|send|upload|download|extract|output|return|write|list|show|print|dump|ignore|forget)\b/i;
-
-  function hasBlocklistTerm(text) {
-    const lower = text.toLowerCase();
-    return BLOCKLIST.some((term) => lower.includes(term));
-  }
-
-  function checkTitle(text) {
-    return hasBlocklistTerm(text) && TITLE_VERB_RE.test(text);
-  }
-
-  function checkUrl(urlStr) {
-    // Extract path+search+hash so the scheme/host prefix doesn't mask verb detection
-    let meaningful = urlStr;
-    try {
-      const parsed = new URL(urlStr);
-      meaningful = decodeURIComponent(parsed.pathname + parsed.search + parsed.hash);
-    } catch {
-      try {
-        meaningful = decodeURIComponent(urlStr);
-      } catch {
-        // leave as-is
-      }
-    }
-    return hasBlocklistTerm(meaningful) && URL_VERB_RE.test(meaningful);
-  }
-
-  let filtered = 0;
-  const sanitized = tabs.map((t) => {
-    let title = t.title
-      .replace(/[\x00-\x1f\x7f]/g, "")
-      .slice(0, 200);
-
-    if (checkTitle(title)) {
-      filtered++;
-      title = "[content filtered]";
-    }
-
-    let url = t.url || "";
-    if (checkUrl(url)) {
-      filtered++;
-      url = "[url filtered]";
-    }
-
-    return { ...t, title, url };
-  });
-
-  if (filtered > 0) {
-    console.log(`[Hayatab] Filtered ${filtered} suspicious tab title(s) before AI analysis.`);
-  }
-
-  return sanitized;
-}
-
 function escapeXml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -271,8 +181,8 @@ async function callAPI(provider, settings, tabData) {
         Authorization: `Bearer ${apiKey}`,
       };
       body = {
-        model: model || "gpt-4o-mini",
-        max_tokens: 1024,
+        model: model || "gpt-5.6-luna",
+        max_completion_tokens: MAX_OUTPUT_TOKENS,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -281,15 +191,15 @@ async function callAPI(provider, settings, tabData) {
       break;
     }
     case "gemini": {
-      const rawModel = model || "gemini-2.0-flash";
+      const rawModel = model || "gemini-3.1-flash-lite";
       // Restrict to safe model identifier characters to prevent URL path injection
-      const m = /^[\w.\-]+$/.test(rawModel) ? rawModel : "gemini-2.0-flash";
+      const m = /^[\w.\-]+$/.test(rawModel) ? rawModel : "gemini-3.1-flash-lite";
       url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
       headers = { "Content-Type": "application/json", "x-goog-api-key": apiKey };
       body = {
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        generationConfig: { maxOutputTokens: 1024 },
+        generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
       };
       break;
     }
@@ -301,7 +211,7 @@ async function callAPI(provider, settings, tabData) {
       } catch {
         throw new Error("Invalid Ollama URL in settings.");
       }
-      if (parsedBase.hostname !== "localhost" && parsedBase.hostname !== "127.0.0.1") {
+      if (parsedBase.hostname !== "localhost") {
         throw new Error("Ollama URL must be localhost.");
       }
       const base = rawUrl.replace(/\/$/, "");
@@ -327,8 +237,8 @@ async function callAPI(provider, settings, tabData) {
         "anthropic-dangerous-direct-browser-access": "true",
       };
       body = {
-        model: model || "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        model: model || "claude-haiku-5-5",
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       };
@@ -348,6 +258,7 @@ async function callAPI(provider, settings, tabData) {
 
   if (!res.ok) {
     if (res.status === 401) throw new Error("Invalid API key. Check Settings.");
+    if (res.status === 403 && provider === "ollama") throw new Error("Ollama blocked the request. Restart Ollama with OLLAMA_ORIGINS=moz-extension://* set.");
     if (res.status === 429) throw new Error("Rate limited by provider. Wait a moment and try again.");
     if (res.status === 529) throw new Error("AI provider is overloaded. Try again in a few seconds.");
     // Try JSON first (Claude/OpenAI/Gemini), fall back to generic message
@@ -355,7 +266,7 @@ async function callAPI(provider, settings, tabData) {
     let errMsg = `API error (${res.status})`;
     try {
       const errJson = JSON.parse(errText);
-      errMsg = errJson.error?.message || errJson.message || errMsg;
+      errMsg = errJson.error?.message || (typeof errJson.error === "string" && errJson.error) || errJson.message || errMsg;
     } catch {
       // Don't surface raw body - use generic message
     }
@@ -379,7 +290,7 @@ function extractText(provider, apiResponse) {
       break;
     case "claude":
     default:
-      text = apiResponse.content?.[0]?.text;
+      text = apiResponse.content?.find((b) => b.type === "text")?.text;
   }
   if (!text) throw new Error("Empty response from AI provider. Try again.");
   return text;
@@ -388,13 +299,13 @@ function extractText(provider, apiResponse) {
 function parseAndValidateGroups(text, allTabIds) {
   let parsed;
   try {
-    const cleaned = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+    const cleaned = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     parsed = JSON.parse(cleaned);
   } catch {
     throw new Error("AI returned invalid JSON. Try again.");
   }
 
-  if (!Array.isArray(parsed.groups) || parsed.groups.length === 0) {
+  if (!Array.isArray(parsed?.groups) || parsed.groups.length === 0) {
     throw new Error("Response missing groups. Try again.");
   }
 
@@ -405,14 +316,14 @@ function parseAndValidateGroups(text, allTabIds) {
   for (const group of parsed.groups) {
     // Validate and sanitize name
     group.name = String(group.name || "Group")
-      .replace(/[^\w\s\-'&]/g, "")
+      .replace(/[^\p{L}\p{N}\s\-'&]/gu, "")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 50) || "Group";
     // Validate color
     if (!validColors.has(group.color)) group.color = "grey";
     // Filter out invalid tab IDs and deduplicate across groups
-    group.tabIds = group.tabIds.filter((id) => {
+    group.tabIds = (Array.isArray(group.tabIds) ? group.tabIds : []).map(Number).filter((id) => {
       if (!allTabIdSet.has(id) || assignedIds.has(id)) return false;
       assignedIds.add(id);
       return true;
