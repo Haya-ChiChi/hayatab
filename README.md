@@ -21,8 +21,8 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 | Provider | Models | Requires |
 |----------|--------|----------|
 | Claude | Haiku 5.5, Sonnet 5.5 | [API key](https://console.anthropic.com/) |
-| OpenAI | GPT-5.6 Luna, GPT-5.6 Sol | [API key](https://platform.openai.com/) |
-| Gemini | Gemini 3.1 Flash-Lite, 3.5 Flash | [API key](https://aistudio.google.com/) |
+| OpenAI | GPT-6 Luna, GPT-6.1 Sol | [API key](https://platform.openai.com/) |
+| Gemini | Gemini 3.5 Flash-Lite, 3.8 Flash | [API key](https://aistudio.google.com/) |
 | Ollama | Llama 3.2, Mistral, Qwen 2.5, Gemma 2, Phi-4, custom | [Ollama](https://ollama.com/) on localhost, started with OLLAMA_ORIGINS=moz-extension://* |
 
 ## Privacy

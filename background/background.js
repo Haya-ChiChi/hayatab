@@ -181,7 +181,7 @@ async function callAPI(provider, settings, tabData) {
         Authorization: `Bearer ${apiKey}`,
       };
       body = {
-        model: model || "gpt-5.6-luna",
+        model: model || "gpt-6-luna",
         max_completion_tokens: MAX_OUTPUT_TOKENS,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
@@ -191,9 +191,9 @@ async function callAPI(provider, settings, tabData) {
       break;
     }
     case "gemini": {
-      const rawModel = model || "gemini-3.1-flash-lite";
+      const rawModel = model || "gemini-3.5-flash-lite";
       // Restrict to safe model identifier characters to prevent URL path injection
-      const m = /^[\w.\-]+$/.test(rawModel) ? rawModel : "gemini-3.1-flash-lite";
+      const m = /^[\w.\-]+$/.test(rawModel) ? rawModel : "gemini-3.5-flash-lite";
       url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
       headers = { "Content-Type": "application/json", "x-goog-api-key": apiKey };
       body = {
