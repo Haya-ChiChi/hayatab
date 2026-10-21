@@ -179,9 +179,6 @@ async function applyGroups() {
       showError(response.error);
       return;
     }
-    if (response.sortedOnly) {
-      document.querySelector("#view-done .done-text").textContent = "Tabs sorted by group!";
-    }
     showView("done");
     setTimeout(() => window.close(), 1200);
   } catch (err) {

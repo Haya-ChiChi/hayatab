@@ -116,13 +116,7 @@ async function handleApplyGroups({ groups }) {
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
-  let result;
-  // Zen reports name "Firefox" in its UA and getBrowserInfo(); it adds a "zen" field instead.
-  if ((await browser.runtime.getBrowserInfo()).zen) {
-    result = await applyGroupsBySort(groups, validTabIds);
-  } else {
-    result = await applyGroupsByNative(groups, validTabIds, windowId);
-  }
+  const result = await applyGroupsByNative(groups, validTabIds, windowId);
 
   pending = null;
   return result;
@@ -159,26 +153,6 @@ async function applyGroupsByNative(groups, validTabIds, windowId) {
 
   if (applied === 0) throw new Error("No groups could be applied. Try re-analyzing.");
   return { ok: true };
-}
-
-async function applyGroupsBySort(groups, validTabIds) {
-  // Build the desired tab order: groups in sequence, each group's tabs in original order
-  const sortedIds = [];
-  for (const group of groups) {
-    for (const id of group.tabIds) {
-      if (validTabIds.has(id)) sortedIds.push(id);
-    }
-  }
-
-  if (sortedIds.length === 0) throw new Error("No tabs to sort. Try re-analyzing.");
-
-  // Fresh query for pinned count to avoid stale data
-  const pinnedTabs = await browser.tabs.query({ currentWindow: true, pinned: true });
-  const pinnedCount = pinnedTabs.length;
-
-  await browser.tabs.move(sortedIds, { index: pinnedCount });
-
-  return { ok: true, sortedOnly: true };
 }
 
 function escapeXml(str) {
