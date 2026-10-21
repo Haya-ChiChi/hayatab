@@ -19,10 +19,6 @@ function showError(message) {
   showView("error");
 }
 
-function clearChildren(el) {
-  while (el.firstChild) el.removeChild(el.firstChild);
-}
-
 function formatRelativeTime(timestamp) {
   const diffMs = Date.now() - timestamp;
   const diffMin = Math.floor(diffMs / 60000);
@@ -61,13 +57,10 @@ async function init() {
   const data = await browser.storage.local.get([
     "provider", "ollamaUrl",
     "apiKey_claude", "apiKey_openai", "apiKey_gemini",
-    "apiKey", // legacy fallback
     "model_claude", "model_openai", "model_gemini", "model_ollama",
-    "model", // legacy fallback
   ]);
   const provider = data.provider || "claude";
-  const providerKeyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
-  const apiKey = data[providerKeyMap[provider]] || data.apiKey || "";
+  const apiKey = data["apiKey_" + provider];
   const configured = provider === "ollama" ? !!data.ollamaUrl : !!apiKey;
   if (!configured) {
     showView("noKey");
@@ -77,7 +70,7 @@ async function init() {
   const tabs = await browser.tabs.query({ currentWindow: true });
   document.getElementById("tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
 
-  const model = data["model_" + provider] || data.model || "";
+  const model = data["model_" + provider] || "";
   const providerName = PROVIDER_NAMES[provider] || provider;
   const modelName = formatModelName(model);
   document.getElementById("provider-label").textContent =
@@ -114,7 +107,7 @@ async function analyzeTabs() {
 
 function renderGroups(groups) {
   const container = document.getElementById("groups-list");
-  clearChildren(container);
+  container.replaceChildren();
 
   groups.forEach((group, groupIndex) => {
     const card = document.createElement("div");
