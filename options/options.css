@@ -4,8 +4,8 @@
   --bg-surface: #FFFFFF;
   --text: #2C2C2C;
   --text-muted: #6B6B6B;
-  --accent: #9A6200;
-  --accent-hover: #7F5000;
+  --accent: #BE123C;
+  --accent-hover: #9F1239;
   --accent-text: #FFFFFF;
   --border: #E5E0DA;
   --radius: 10px;
@@ -22,8 +22,8 @@
     --bg-surface: #24243A;
     --text: #E8E8F0;
     --text-muted: #9090AA;
-    --accent: #E9A032;
-    --accent-hover: #F0B050;
+    --accent: #FB7185;
+    --accent-hover: #FDA4AF;
     --accent-text: #1A1A24;
     --border: #36365A;
     --green: #3BBA5C;
