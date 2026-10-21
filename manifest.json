@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Hayatab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AI-powered tab grouping",
   "permissions": [
     "tabs",

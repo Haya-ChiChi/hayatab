@@ -28,6 +28,17 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
 const DEFAULT_COOLDOWN_MS = 10_000;
 const IS_ZEN = navigator.userAgent.includes("Zen/");
 
+// Claude model IDs retired from the picker, mapped to their current equivalent.
+// Settings saved before the model refresh still hold the old ID; without this the
+// options page would show the new default while requests kept using the old model.
+const LEGACY_CLAUDE_MODELS = {
+  "claude-haiku-4-5-20251001": "claude-haiku-5-5",
+  "claude-sonnet-4-5-20250929": "claude-sonnet-5-5",
+  "claude-opus-4-6": "claude-opus-5-5",
+};
+
+const DEFAULT_CLAUDE_MODEL = "claude-haiku-5-5";
+
 let pendingGroups = null;
 let pendingTimestamp = null;
 
@@ -64,6 +75,13 @@ async function handleAnalyzeTabs() {
   const providerKeyMap = { claude: "apiKey_claude", openai: "apiKey_openai", gemini: "apiKey_gemini" };
   settings.apiKey = settings[providerKeyMap[provider]] || settings.apiKey || "";
   settings.model = settings["model_" + provider] || settings.model || "";
+
+  // Upgrade a stored legacy Claude model and persist it, so the settings UI and
+  // the popup's model label agree with what actually gets called.
+  if (provider === "claude" && LEGACY_CLAUDE_MODELS[settings.model]) {
+    settings.model = LEGACY_CLAUDE_MODELS[settings.model];
+    await browser.storage.local.set({ model_claude: settings.model });
+  }
 
   // Validate config
   if (provider === "ollama") {
@@ -327,8 +345,13 @@ async function callAPI(provider, settings, tabData) {
         "anthropic-dangerous-direct-browser-access": "true",
       };
       body = {
-        model: model || "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        model: model || DEFAULT_CLAUDE_MODEL,
+        // Current Claude models think by default and thinking shares this budget,
+        // so leave room for the reasoning tokens plus the JSON.
+        max_tokens: 4096,
+        // Grouping tabs is a short classification task - the cheapest effort level
+        // is plenty, and it keeps the thinking spend down.
+        output_config: { effort: "low" },
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       };
@@ -379,7 +402,14 @@ function extractText(provider, apiResponse) {
       break;
     case "claude":
     default:
-      text = apiResponse.content?.[0]?.text;
+      // Safety classifiers can decline a request with HTTP 200, so check before
+      // reading content.
+      if (apiResponse.stop_reason === "refusal") {
+        throw new Error("The AI declined to analyze these tabs. Try again with fewer tabs open.");
+      }
+      // Thinking blocks precede the answer in the content array, so find the
+      // text block rather than assuming it comes first.
+      text = apiResponse.content?.find((block) => block.type === "text")?.text;
   }
   if (!text) throw new Error("Empty response from AI provider. Try again.");
   return text;
