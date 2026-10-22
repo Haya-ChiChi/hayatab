@@ -40,7 +40,7 @@ function hideStaleIndicator() {
   document.getElementById("stale-indicator").classList.add("hidden");
 }
 
-const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", ollama: "Ollama" };
+const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", ollama: "Ollama", custom: "Custom API" };
 
 function formatModelName(model) {
   if (!model) return "";
@@ -55,13 +55,13 @@ function formatModelName(model) {
 
 async function init() {
   const data = await browser.storage.local.get([
-    "provider", "ollamaUrl",
-    "apiKey_claude", "apiKey_openai", "apiKey_gemini",
-    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "provider", "ollamaUrl", "customBaseUrl",
+    "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_custom",
+    "model_claude", "model_openai", "model_gemini", "model_ollama", "model_custom",
   ]);
   const provider = data.provider || "claude";
   const apiKey = data["apiKey_" + provider];
-  const configured = provider === "ollama" ? !!data.ollamaUrl : !!apiKey;
+  const configured = provider === "ollama" ? !!data.ollamaUrl : provider === "custom" ? !!data.customBaseUrl : !!apiKey;
   if (!configured) {
     showView("noKey");
     return;

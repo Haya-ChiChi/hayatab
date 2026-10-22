@@ -45,10 +45,20 @@ const PROVIDERS = {
     credentialType: "ollama",
     storageKey: "ollamaUrl",
   },
+  custom: {
+    label: "Custom API",
+    models: [
+      { value: "custom", label: "Custom model..." },
+    ],
+    credentialType: "customEndpoint",
+    keyPlaceholder: "sk-... (optional for local servers)",
+    keyLabel: "API Key (optional)",
+    storageKey: "apiKey_custom",
+  },
 };
 
 // All per-provider storage keys
-const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "ollamaUrl"];
+const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_custom", "ollamaUrl", "customBaseUrl"];
 
 const providerTabs = document.getElementById("provider-tabs");
 const providerConfig = document.getElementById("provider-config");
@@ -134,7 +144,11 @@ function renderProviderTabs() {
 }
 
 function isProviderConfigured(providerId) {
-  return !!allSavedData[PROVIDERS[providerId].storageKey];
+  const config = PROVIDERS[providerId];
+  if (config.credentialType === "customEndpoint") {
+    return !!allSavedData.customBaseUrl;
+  }
+  return !!allSavedData[config.storageKey];
 }
 
 // --- Provider config panel ---
@@ -176,8 +190,21 @@ function renderProviderConfig() {
   modelField.appendChild(modelSelect);
   providerConfig.appendChild(modelField);
 
+  // Custom API: base URL and model name fields (before the shared key UI)
+  if (config.credentialType === "customEndpoint") {
+    const baseUrlField = createField("API Base URL", "text", "custom-base-url", "https://openrouter.ai/api/v1");
+    providerConfig.appendChild(baseUrlField);
+    document.getElementById("custom-base-url").value = allSavedData.customBaseUrl || "";
+
+    const customField = createField("Custom Model Name", "text", "custom-model", "Exact model ID, e.g. deepseek-chat");
+    providerConfig.appendChild(customField);
+    if (savedModel) {
+      document.getElementById("custom-model").value = savedModel;
+    }
+  }
+
   // Credential fields
-  if (config.credentialType === "apiKey") {
+  if (config.credentialType === "apiKey" || config.credentialType === "customEndpoint") {
     const savedKey = allSavedData[config.storageKey];
     if (savedKey) {
       // Show masked key with change button
@@ -254,7 +281,7 @@ function renderProviderConfig() {
 async function loadSettings() {
   allSavedData = await browser.storage.local.get([
     "provider", "cooldown",
-    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "model_claude", "model_openai", "model_gemini", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);
   savedProvider = allSavedData.provider || "claude";
@@ -275,25 +302,72 @@ btnSave.addEventListener("click", async () => {
   // Resolve model
   const modelSelect = document.getElementById("model");
   let model = modelSelect.value;
-  if (activeProvider === "ollama" && model === "custom") {
+  if (model === "custom" && (activeProvider === "ollama" || activeProvider === "custom")) {
     const customModel = document.getElementById("custom-model")?.value.trim();
     if (!customModel) {
       showStatus("Enter a custom model name.", "error");
       return;
     }
-    toSave["model_ollama"] = customModel;
+    toSave["model_" + activeProvider] = customModel;
   } else {
     toSave["model_" + activeProvider] = model;
   }
 
   // Resolve credentials (per-provider)
-  if (config.credentialType === "apiKey") {
+  if (config.credentialType === "apiKey" || config.credentialType === "customEndpoint") {
     const value = document.getElementById("api-key")?.value.trim();
     if (value) {
       toSave[config.storageKey] = value;
-    } else if (!allSavedData[config.storageKey]) {
+    } else if (config.credentialType === "apiKey" && !allSavedData[config.storageKey]) {
       showStatus("Enter an API key.", "error");
       return;
+    }
+
+    if (config.credentialType === "customEndpoint") {
+      const baseUrlValue = document.getElementById("custom-base-url")?.value.trim();
+      if (!baseUrlValue) {
+        showStatus("Enter the API base URL.", "error");
+        return;
+      }
+      let parsed;
+      try {
+        parsed = new URL(baseUrlValue);
+      } catch {
+        showStatus("Invalid API base URL.", "error");
+        return;
+      }
+      if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
+        showStatus("API base URL must use HTTPS (http allowed only for localhost).", "error");
+        return;
+      }
+      // Ask for access to just this origin (optional_permissions), only now
+      // that the user is setting the provider up - never at install/update.
+      const origin = `${parsed.protocol}//${parsed.hostname}/*`;
+      let granted = false;
+      try {
+        granted = await browser.permissions.request({ origins: [origin] });
+      } catch {
+        granted = false;
+      }
+      if (!granted) {
+        showStatus(`Permission for ${parsed.hostname} was not granted - the Custom API provider needs it to connect.`, "error");
+        return;
+      }
+      // Release the previously granted origin if the endpoint moved
+      const newBase = baseUrlValue.replace(/\/$/, "");
+      const oldBase = allSavedData.customBaseUrl;
+      if (oldBase && oldBase !== newBase) {
+        try {
+          const oldParsed = new URL(oldBase);
+          const oldOrigin = `${oldParsed.protocol}//${oldParsed.hostname}/*`;
+          if (oldOrigin !== origin) {
+            await browser.permissions.remove({ origins: [oldOrigin] });
+          }
+        } catch {
+          // Old value unparsable or origin not removable - nothing to release
+        }
+      }
+      toSave.customBaseUrl = newBase;
     }
   } else {
     const urlValue = document.getElementById("ollama-url")?.value.trim();
@@ -320,7 +394,7 @@ btnSave.addEventListener("click", async () => {
   savedProvider = activeProvider;
   allSavedData = await browser.storage.local.get([
     "provider", "cooldown",
-    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "model_claude", "model_openai", "model_gemini", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);
   renderProviderTabs();

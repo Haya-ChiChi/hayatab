@@ -5,7 +5,7 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 ## Features
 
 - **One-click analysis** - click "Analyze Tabs" and get suggested groups instantly
-- **Multiple AI providers** - Claude, OpenAI, Gemini, or Ollama (fully local)
+- **Multiple AI providers** - Claude, OpenAI, Gemini, Ollama (fully local), or any OpenAI-compatible API (Custom API provider)
 - **Native tab groups** - uses Firefox's built-in tab grouping API
 - **Privacy-first** - no telemetry, no tracking, API keys stored locally only
 
@@ -24,6 +24,7 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 | OpenAI | GPT-6 Luna, GPT-6.1 Sol | [API key](https://platform.openai.com/) |
 | Gemini | Gemini 3.5 Flash-Lite, 3.8 Flash | [API key](https://aistudio.google.com/) |
 | Ollama | Llama 3.2, Mistral, Qwen 2.5, Gemma 2, Phi-4, custom | [Ollama](https://ollama.com/) on localhost, started with OLLAMA_ORIGINS=moz-extension://* |
+| Custom API | Any model on an OpenAI-compatible endpoint (OpenRouter, DeepSeek, Groq, Mistral, Together, xAI, LM Studio, ...) | Base URL + optional API key; host permission for the configured URL is requested only when you set it up |
 
 ## Privacy
 
