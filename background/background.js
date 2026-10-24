@@ -205,6 +205,10 @@ async function callAPI(provider, settings, tabData) {
       break;
     }
     case "zai": {
+      // The api.z.ai origin is an optional permission; without it CORS blocks the call
+      if (!(await browser.permissions.contains({ origins: ["https://api.z.ai/*"] }))) {
+        throw new Error("Z.AI needs access to api.z.ai. Open Settings and re-save the Z.AI key to grant it.");
+      }
       url = "https://api.z.ai/api/paas/v4/chat/completions";
       headers = {
         "Content-Type": "application/json",

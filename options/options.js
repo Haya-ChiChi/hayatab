@@ -251,6 +251,21 @@ function extractModelIds(providerId, json) {
   return [...new Set(ids)].sort();
 }
 
+// Z.AI's API does not pass CORS preflight, so it is only reachable with a host
+// permission. It is optional and requested on first use, so existing installs
+// get no new permission on update unless they actually enable Z.AI.
+const ZAI_ORIGINS = ["https://api.z.ai/*"];
+
+async function ensureProviderOrigin(providerId) {
+  if (providerId !== "zai") return true;
+  if (await browser.permissions.contains({ origins: ZAI_ORIGINS })) return true;
+  try {
+    return await browser.permissions.request({ origins: ZAI_ORIGINS });
+  } catch {
+    return false;
+  }
+}
+
 // --- Provider tabs ---
 
 function renderProviderTabs() {
@@ -354,6 +369,9 @@ function renderProviderConfig() {
     refreshBtn.disabled = true;
     refreshBtn.classList.add("loading");
     try {
+      if (!(await ensureProviderOrigin(activeProvider))) {
+        throw new Error("Allow access to api.z.ai in the permission prompt.");
+      }
       const models = await fetchAvailableModels(activeProvider);
       if (models.length === 0) throw new Error("Provider returned no models.");
       rebuildModelSelect(modelSelect, models, activeProvider);
@@ -488,6 +506,16 @@ async function loadSettings() {
 
 btnSave.addEventListener("click", async () => {
   const config = PROVIDERS[activeProvider];
+
+  // Ask for the optional Z.AI origin while still inside the click gesture
+  if (activeProvider === "zai") {
+    const hasKey = !!document.getElementById("api-key")?.value.trim() || !!allSavedData.apiKey_zai;
+    if (hasKey && !(await ensureProviderOrigin(activeProvider))) {
+      showStatus("Z.AI needs access to api.z.ai — click Save again and allow the permission.", "error");
+      return;
+    }
+  }
+
   const toSave = {
     provider: activeProvider,
     cooldown: parseInt(cooldownSelect.value, 10),
