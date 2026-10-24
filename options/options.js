@@ -32,6 +32,18 @@ const PROVIDERS = {
     keyLabel: "Google AI API Key",
     storageKey: "apiKey_gemini",
   },
+  zai: {
+    label: "Z.AI",
+    models: [
+      { value: "glm-5.3", label: "GLM-5.3 (most capable)" },
+      { value: "glm-5.2", label: "GLM-5.2" },
+      { value: "glm-4.7-flash", label: "GLM-4.7 Flash (cheapest)" },
+    ],
+    credentialType: "apiKey",
+    keyPlaceholder: "xxxxxxxx.xxxxxxxx",
+    keyLabel: "Z.AI API Key",
+    storageKey: "apiKey_zai",
+  },
   ollama: {
     label: "Ollama",
     models: [
@@ -48,7 +60,7 @@ const PROVIDERS = {
 };
 
 // All per-provider storage keys
-const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "ollamaUrl"];
+const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_zai", "apiKey_ollama", "ollamaUrl"];
 
 const providerTabs = document.getElementById("provider-tabs");
 const providerConfig = document.getElementById("provider-config");
@@ -88,6 +100,170 @@ function createField(labelText, inputType, inputId, placeholder) {
   field.appendChild(input);
 
   return field;
+}
+
+function createRefreshIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const arc = document.createElementNS(ns, "path");
+  arc.setAttribute("d", "M13.5 8a5.5 5.5 0 1 1-1.6-3.9");
+  svg.appendChild(arc);
+
+  const head = document.createElementNS(ns, "path");
+  head.setAttribute("d", "M14 2v3h-3");
+  svg.appendChild(head);
+
+  return svg;
+}
+
+// Replace the select options with fetched models, preserving the current selection
+function rebuildModelSelect(select, models, providerId) {
+  const current = select.value;
+  select.replaceChildren();
+
+  for (const id of models) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = id;
+    select.appendChild(opt);
+  }
+
+  const known = new Set(models);
+  if (providerId === "ollama") {
+    // Keep the custom entry available alongside fetched local models
+    const opt = document.createElement("option");
+    opt.value = "custom";
+    opt.textContent = "Custom model...";
+    select.appendChild(opt);
+    known.add("custom");
+  }
+
+  if (known.has(current)) {
+    select.value = current;
+  } else if (current) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = `${current} (saved)`;
+    select.insertBefore(opt, select.firstChild);
+    select.value = current;
+  }
+
+  // Re-sync listeners (for example the Ollama custom-field visibility)
+  select.dispatchEvent(new Event("change"));
+}
+
+// Fetch the provider's model list. Prefers credentials typed in the form over stored ones.
+async function fetchAvailableModels(providerId) {
+  const config = PROVIDERS[providerId];
+  let url;
+  const headers = {};
+
+  if (providerId === "ollama") {
+    const rawUrl = document.getElementById("ollama-url")?.value.trim()
+      || allSavedData.ollamaUrl || "http://localhost:11434";
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      throw new Error("Invalid Ollama URL.");
+    }
+    if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+      throw new Error("Ollama URL must be localhost.");
+    }
+    url = `${rawUrl.replace(/\/$/, "")}/api/tags`;
+    if (document.getElementById("ollama-key-required")?.checked) {
+      const key = document.getElementById("ollama-api-key")?.value.trim() || allSavedData.apiKey_ollama;
+      if (key) headers.Authorization = `Bearer ${key}`;
+    }
+  } else {
+    const key = document.getElementById("api-key")?.value.trim() || allSavedData[config.storageKey];
+    if (!key) throw new Error("Save an API key first.");
+
+    if (providerId === "claude") {
+      url = "https://api.anthropic.com/v1/models?limit=100";
+      headers["x-api-key"] = key;
+      headers["anthropic-version"] = "2023-06-01";
+      headers["anthropic-dangerous-direct-browser-access"] = "true";
+    } else if (providerId === "gemini") {
+      url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000";
+      headers["x-goog-api-key"] = key;
+    } else if (providerId === "zai") {
+      url = "https://api.z.ai/api/paas/v4/models";
+      headers.Authorization = `Bearer ${key}`;
+    } else {
+      url = "https://api.openai.com/v1/models";
+      headers.Authorization = `Bearer ${key}`;
+    }
+  }
+
+  let res;
+  try {
+    res = await fetch(url, { headers });
+  } catch {
+    throw new Error("Network error.");
+  }
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) throw new Error("Invalid API key.");
+    throw new Error(`Provider returned ${res.status}.`);
+  }
+  const json = await res.json();
+  return extractModelIds(providerId, json);
+}
+
+// Normalize provider response shapes and drop non-chat models
+function extractModelIds(providerId, json) {
+  let ids;
+
+  if (providerId === "gemini") {
+    ids = (json.models || [])
+      .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m) => String(m.name || "").replace(/^models\//, ""))
+      .filter((id) => !/embedding|aqa|veo|imagen|tts|audio|native/i.test(id));
+  } else if (providerId === "claude") {
+    ids = (json.data || [])
+      .map((m) => m.id)
+      .filter((id) => typeof id === "string" && id.startsWith("claude"));
+  } else if (providerId === "ollama") {
+    ids = (json.models || [])
+      .map((m) => m.name)
+      .filter((id) => typeof id === "string");
+  } else {
+    // OpenAI and Z.AI share the data[].id shape
+    ids = (json.data || [])
+      .map((m) => m.id)
+      .filter((id) => typeof id === "string");
+    if (providerId === "openai") {
+      ids = ids.filter((id) => !/embed|whisper|tts|dall-e|image|audio|moderation|transcri|realtime|search|computer-use|batches|codex/i.test(id));
+    } else {
+      ids = ids.filter((id) => id.startsWith("glm") && !id.includes("image"));
+    }
+  }
+
+  return [...new Set(ids)].sort();
+}
+
+// Z.AI's API does not pass CORS preflight, so it is only reachable with a host
+// permission. It is optional and requested on first use, so existing installs
+// get no new permission on update unless they actually enable Z.AI.
+const ZAI_ORIGINS = ["https://api.z.ai/*"];
+
+async function ensureProviderOrigin(providerId) {
+  if (providerId !== "zai") return true;
+  if (await browser.permissions.contains({ origins: ZAI_ORIGINS })) return true;
+  try {
+    return await browser.permissions.request({ origins: ZAI_ORIGINS });
+  } catch {
+    return false;
+  }
 }
 
 // --- Provider tabs ---
@@ -170,10 +346,46 @@ function renderProviderConfig() {
       modelSelect.value = savedModel;
     } else if (activeProvider === "ollama") {
       modelSelect.value = "custom";
+    } else {
+      // Keep unknown saved values selectable so they are not lost on save
+      const opt = document.createElement("option");
+      opt.value = savedModel;
+      opt.textContent = `${savedModel} (saved)`;
+      modelSelect.insertBefore(opt, modelSelect.firstChild);
+      modelSelect.value = savedModel;
     }
   }
 
-  modelField.appendChild(modelSelect);
+  const modelRow = document.createElement("div");
+  modelRow.className = "model-row";
+  modelRow.appendChild(modelSelect);
+
+  const refreshBtn = document.createElement("button");
+  refreshBtn.type = "button";
+  refreshBtn.className = "btn-refresh";
+  refreshBtn.title = "Load available models from the provider";
+  refreshBtn.appendChild(createRefreshIcon());
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add("loading");
+    try {
+      if (!(await ensureProviderOrigin(activeProvider))) {
+        throw new Error("Allow access to api.z.ai in the permission prompt.");
+      }
+      const models = await fetchAvailableModels(activeProvider);
+      if (models.length === 0) throw new Error("Provider returned no models.");
+      rebuildModelSelect(modelSelect, models, activeProvider);
+      showStatus(`Loaded ${models.length} models.`, "success");
+    } catch (err) {
+      showStatus(`Failed to load models: ${err.message}`, "error");
+    } finally {
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove("loading");
+    }
+  });
+  modelRow.appendChild(refreshBtn);
+
+  modelField.appendChild(modelRow);
   providerConfig.appendChild(modelField);
 
   // Credential fields
@@ -230,6 +442,33 @@ function renderProviderConfig() {
     providerConfig.appendChild(urlField);
     document.getElementById("ollama-url").value = allSavedData.ollamaUrl || "http://localhost:11434";
 
+    // Optional API key: editable only while the checkbox is checked
+    const keyRequiredField = document.createElement("div");
+    keyRequiredField.className = "field field-check";
+
+    const keyCheck = document.createElement("input");
+    keyCheck.type = "checkbox";
+    keyCheck.id = "ollama-key-required";
+    keyCheck.checked = !!allSavedData.ollamaApiKeyRequired;
+    keyRequiredField.appendChild(keyCheck);
+
+    const keyCheckLabel = document.createElement("label");
+    keyCheckLabel.setAttribute("for", "ollama-key-required");
+    keyCheckLabel.textContent = "API Key Required";
+    keyRequiredField.appendChild(keyCheckLabel);
+
+    providerConfig.appendChild(keyRequiredField);
+
+    const ollamaKeyField = createField("Ollama API Key", "password", "ollama-api-key", "Bearer token");
+    providerConfig.appendChild(ollamaKeyField);
+    const ollamaKeyInput = document.getElementById("ollama-api-key");
+    ollamaKeyInput.value = allSavedData.apiKey_ollama || "";
+    ollamaKeyInput.disabled = !keyCheck.checked;
+    keyCheck.addEventListener("change", () => {
+      ollamaKeyInput.disabled = !keyCheck.checked;
+      if (keyCheck.checked) ollamaKeyInput.focus();
+    });
+
     // Custom model name field
     const customField = createField("Custom Model Name", "text", "custom-model", "e.g. deepseek-r1");
     customField.id = "custom-model-field";
@@ -253,8 +492,8 @@ function renderProviderConfig() {
 
 async function loadSettings() {
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown",
-    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "provider", "cooldown", "ollamaApiKeyRequired",
+    "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama",
     ...ALL_KEY_FIELDS,
   ]);
   savedProvider = allSavedData.provider || "claude";
@@ -267,6 +506,16 @@ async function loadSettings() {
 
 btnSave.addEventListener("click", async () => {
   const config = PROVIDERS[activeProvider];
+
+  // Ask for the optional Z.AI origin while still inside the click gesture
+  if (activeProvider === "zai") {
+    const hasKey = !!document.getElementById("api-key")?.value.trim() || !!allSavedData.apiKey_zai;
+    if (hasKey && !(await ensureProviderOrigin(activeProvider))) {
+      showStatus("Z.AI needs access to api.z.ai — click Save again and allow the permission.", "error");
+      return;
+    }
+  }
+
   const toSave = {
     provider: activeProvider,
     cooldown: parseInt(cooldownSelect.value, 10),
@@ -312,6 +561,18 @@ btnSave.addEventListener("click", async () => {
       return;
     }
     toSave.ollamaUrl = urlValue;
+
+    // Save the checkbox state; the stored key is only used when checked
+    const keyRequired = document.getElementById("ollama-key-required")?.checked || false;
+    toSave.ollamaApiKeyRequired = keyRequired;
+    if (keyRequired) {
+      const keyValue = document.getElementById("ollama-api-key")?.value.trim();
+      if (!keyValue) {
+        showStatus("Enter the Ollama API key or uncheck \"API Key Required\".", "error");
+        return;
+      }
+      toSave.apiKey_ollama = keyValue;
+    }
   }
 
   await browser.storage.local.set(toSave);
@@ -319,8 +580,8 @@ btnSave.addEventListener("click", async () => {
   // Refresh local cache and re-render
   savedProvider = activeProvider;
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown",
-    "model_claude", "model_openai", "model_gemini", "model_ollama",
+    "provider", "cooldown", "ollamaApiKeyRequired",
+    "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama",
     ...ALL_KEY_FIELDS,
   ]);
   renderProviderTabs();

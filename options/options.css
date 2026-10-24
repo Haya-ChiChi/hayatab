@@ -161,6 +161,81 @@ input[type="password"]:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+/* ── Model Row ── */
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-refresh {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-refresh:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.btn-refresh.loading svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Checkbox Fields ── */
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.field-check label {
+  margin-bottom: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Disabled Inputs ── */
+input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── API Key Display ── */
 .key-display-row {
   display: flex;
@@ -315,5 +390,13 @@ input[type="text"]:focus {
 
   .btn:active {
     transform: none;
+  }
+
+  #credential-fields .field {
+    animation: none;
+  }
+
+  .btn-refresh.loading svg {
+    animation: none;
   }
 }
