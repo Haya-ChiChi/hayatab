@@ -13,6 +13,7 @@ When you click "Analyze Tabs", the extension sends **tab titles and URLs** from 
 - **Claude** (Anthropic) - api.anthropic.com
 - **OpenAI** - api.openai.com
 - **Gemini** (Google) - generativelanguage.googleapis.com
+- **Z.AI** - api.z.ai
 - **Ollama** (Local) - localhost only, no data leaves your machine
 - **Custom API** - the OpenAI-compatible base URL you configure in settings (e.g. OpenRouter, DeepSeek, Groq, or a local server such as LM Studio). Tab titles and URLs are sent only to that URL, and only when you choose this provider. The extension asks Firefox for permission to access that single host only when you save the Custom API settings - it is never requested at install or update time, and no other host permission is requested
 

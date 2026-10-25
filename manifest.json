@@ -13,6 +13,7 @@
     "http://localhost/*"
   ],
   "optional_permissions": [
+    "https://api.z.ai/*",
     "https://*/*"
   ],
   "background": {

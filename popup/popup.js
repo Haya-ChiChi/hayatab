@@ -40,7 +40,7 @@ function hideStaleIndicator() {
   document.getElementById("stale-indicator").classList.add("hidden");
 }
 
-const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", ollama: "Ollama", custom: "Custom API" };
+const PROVIDER_NAMES = { claude: "Claude", openai: "OpenAI", gemini: "Gemini", zai: "Z.AI", ollama: "Ollama", custom: "Custom API" };
 
 function formatModelName(model) {
   if (!model) return "";
@@ -50,14 +50,15 @@ function formatModelName(model) {
     .replace(/-preview.*$/, "")
     .replace(/^claude-/, "")
     .replace(/^gpt-/, "GPT-")
-    .replace(/^gemini-/, "Gemini ");
+    .replace(/^gemini-/, "Gemini ")
+    .replace(/^glm-/, "GLM-");
 }
 
 async function init() {
   const data = await browser.storage.local.get([
     "provider", "ollamaUrl", "customBaseUrl",
-    "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_custom",
-    "model_claude", "model_openai", "model_gemini", "model_ollama", "model_custom",
+    "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_zai", "apiKey_custom",
+    "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
   ]);
   const provider = data.provider || "claude";
   const apiKey = data["apiKey_" + provider];

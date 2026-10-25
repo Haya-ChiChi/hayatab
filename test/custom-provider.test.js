@@ -64,7 +64,7 @@ test("custom provider: builds chat/completions URL, sends key, parses groups", a
   assert.strictEqual(calls[0].url, "https://openrouter.ai/api/v1/chat/completions");
   assert.strictEqual(calls[0].headers.Authorization, "Bearer sk-or-1");
   assert.strictEqual(calls[0].body.model, "deepseek/deepseek-chat");
-  assert.strictEqual(calls[0].body.max_completion_tokens, 8192);
+  assert.strictEqual(calls[0].body.max_tokens, 8192);
   assert.strictEqual(res.groups.length, 2);
 });
 
