@@ -57,10 +57,10 @@ browser.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
 
 async function handleAnalyzeTabs() {
   const settings = await browser.storage.local.get([
-    "provider", "cooldown", "lastAnalysisTime", "ollamaUrl",
+    "provider", "cooldown", "lastAnalysisTime", "ollamaUrl", "customBaseUrl",
     "ollamaApiKeyRequired", "apiKey_ollama",
-    "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama",
-    "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_zai",
+    "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
+    "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_zai", "apiKey_custom",
   ]);
 
   const provider = settings.provider || "claude";
@@ -72,6 +72,9 @@ async function handleAnalyzeTabs() {
   // Validate config
   if (provider === "ollama") {
     if (!settings.ollamaUrl) throw new Error("No Ollama URL configured. Open extension settings.");
+  } else if (provider === "custom") {
+    if (!settings.customBaseUrl) throw new Error("No custom API URL configured. Open extension settings.");
+    // API key is optional for the custom provider (local servers may not require one)
   } else {
     if (!settings.apiKey) throw new Error("No API key configured. Open extension settings.");
   }
@@ -166,7 +169,7 @@ function escapeXml(str) {
 }
 
 async function callAPI(provider, settings, tabData) {
-  const { model, apiKey, ollamaUrl } = settings;
+  const { model, apiKey, ollamaUrl, customBaseUrl } = settings;
   const tabLines = tabData
     .map((t) => `<tab id="${escapeXml(t.id)}">\n  <title>${escapeXml(t.title)}</title>\n  <url>${escapeXml(t.url)}</url>\n</tab>`)
     .join("\n");
@@ -184,6 +187,39 @@ async function callAPI(provider, settings, tabData) {
       body = {
         model: model || "gpt-6-luna",
         max_completion_tokens: MAX_OUTPUT_TOKENS,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+      };
+      break;
+    }
+    case "custom": {
+      if (!model) throw new Error("No custom model configured. Open extension settings.");
+      const rawBase = customBaseUrl || "";
+      let parsedBase;
+      try {
+        parsedBase = new URL(rawBase);
+      } catch {
+        throw new Error("Invalid custom API URL in settings.");
+      }
+      if (parsedBase.protocol !== "https:" && parsedBase.hostname !== "localhost") {
+        throw new Error("Custom API URL must use HTTPS (http allowed only for localhost).");
+      }
+      // The host permission for this origin is requested in Settings when the
+      // provider is saved (optional_permissions); refuse to call without it.
+      const origin = `${parsedBase.protocol}//${parsedBase.hostname}/*`;
+      if (!(await browser.permissions.contains({ origins: [origin] }))) {
+        throw new Error(`Permission for ${parsedBase.hostname} is not granted. Open extension settings and save the Custom API provider again to grant it.`);
+      }
+      const base = rawBase.replace(/\/$/, "");
+      url = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+      headers = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      body = {
+        model,
+        // max_tokens, not max_completion_tokens: most OpenAI-compatible servers only know the older name
+        max_tokens: MAX_OUTPUT_TOKENS,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -307,6 +343,7 @@ function extractText(provider, apiResponse) {
   switch (provider) {
     case "openai":
     case "zai":
+    case "custom":
       text = apiResponse.choices?.[0]?.message?.content;
       break;
     case "gemini":
