@@ -217,7 +217,7 @@ async function callAPI(provider, settings, tabData) {
       body = {
         model: model || "glm-5.3",
         // GLM thinking models emit reasoning tokens before the JSON answer
-        max_tokens: 4096,
+        max_tokens: MAX_OUTPUT_TOKENS,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },

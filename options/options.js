@@ -176,7 +176,7 @@ async function fetchAvailableModels(providerId) {
     } catch {
       throw new Error("Invalid Ollama URL.");
     }
-    if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+    if (parsed.hostname !== "localhost") {
       throw new Error("Ollama URL must be localhost.");
     }
     url = `${rawUrl.replace(/\/$/, "")}/api/tags`;
