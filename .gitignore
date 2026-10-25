@@ -14,6 +14,9 @@ CLAUDE.md
 .claude.local.md
 docs/plans/
 
+# Agent planning documents
+planning/
+
 # Secrets
 .env
 .env.*

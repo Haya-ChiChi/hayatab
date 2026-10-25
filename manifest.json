@@ -12,6 +12,9 @@
     "https://generativelanguage.googleapis.com/*",
     "http://localhost/*"
   ],
+  "optional_permissions": [
+    "https://api.z.ai/*"
+  ],
   "background": {
     "scripts": ["background/background.js"],
     "persistent": true
@@ -32,7 +35,7 @@
     "48": "icons/icon.svg",
     "96": "icons/icon.svg"
   },
-  "content_security_policy": "script-src 'self'; object-src 'none'; connect-src https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com http://localhost:*;",
+  "content_security_policy": "script-src 'self'; object-src 'none'; connect-src https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://api.z.ai http://localhost:*;",
   "browser_specific_settings": {
     "gecko": {
       "id": "hayatab@hayase.moe",
