@@ -270,7 +270,8 @@ const ZAI_ORIGINS = ["https://api.z.ai/*"];
 
 async function ensureProviderOrigin(providerId) {
   if (providerId !== "zai") return true;
-  if (await browser.permissions.contains({ origins: ZAI_ORIGINS })) return true;
+  // Firefox only allows request() synchronously inside the click handler, so no await
+  // may come first; it resolves true without a prompt when already granted
   try {
     return await browser.permissions.request({ origins: ZAI_ORIGINS });
   } catch {
@@ -595,11 +596,15 @@ btnSave.addEventListener("click", async () => {
       // Ask for access to just this origin (optional_permissions), only now
       // that the user is setting the provider up - never at install/update.
       const origin = `${parsed.protocol}//${parsed.hostname}/*`;
-      let granted = false;
-      try {
-        granted = await browser.permissions.request({ origins: [origin] });
-      } catch {
-        granted = false;
+      // http is only allowed for localhost, a required permission; Firefox rejects
+      // requesting it because it is not in optional_permissions
+      let granted = parsed.protocol === "http:";
+      if (!granted) {
+        try {
+          granted = await browser.permissions.request({ origins: [origin] });
+        } catch {
+          granted = false;
+        }
       }
       if (!granted) {
         showStatus(`Permission for ${parsed.hostname} was not granted - the Custom API provider needs it to connect.`, "error");
