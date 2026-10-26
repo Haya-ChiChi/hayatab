@@ -55,6 +55,52 @@ browser.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
   }
 });
 
+// --- Cross-platform tab access (Firefox for Android) ---
+// Android's tabs.query rejects the `hidden` filter, the extension popup
+// itself opens as a tab, and native tab groups are unavailable. So: query
+// without filters, drop pinned/hidden/extension tabs client-side, and work
+// in the window the user is actually looking at (its active tab).
+function isExtensionTab(tab) {
+  const prefix = browser.runtime.getURL("");
+  return typeof tab.url === "string" && tab.url.startsWith(prefix);
+}
+
+function filterUserTabs(allTabs) {
+  return allTabs.filter((t) => !t.pinned && !t.hidden && !isExtensionTab(t));
+}
+
+async function pickUserWindowId(tabs) {
+  const active = tabs.filter((t) => t.active);
+  if (active.length === 1) return active[0].windowId;
+  if (active.length > 1) {
+    try {
+      const current = await browser.windows.getCurrent();
+      const hit = active.find((t) => t.windowId === current.id);
+      if (hit) return hit.windowId;
+    } catch {
+      // windows API unavailable (Android): fall through to the first active tab
+    }
+    return active[0].windowId;
+  }
+  // No active tab: use the window holding the most tabs
+  const counts = new Map();
+  for (const tab of tabs) counts.set(tab.windowId, (counts.get(tab.windowId) || 0) + 1);
+  let bestId = tabs[0].windowId;
+  let bestCount = 0;
+  for (const [id, n] of counts) {
+    if (n > bestCount) { bestId = id; bestCount = n; }
+  }
+  return bestId;
+}
+
+async function queryUserTabs() {
+  const all = await browser.tabs.query({});
+  const usable = filterUserTabs(all);
+  if (usable.length === 0) return [];
+  const windowId = await pickUserWindowId(usable);
+  return usable.filter((t) => t.windowId === windowId);
+}
+
 async function handleAnalyzeTabs() {
   const settings = await browser.storage.local.get([
     "provider", "cooldown", "lastAnalysisTime", "ollamaUrl", "customBaseUrl",
@@ -88,7 +134,7 @@ async function handleAnalyzeTabs() {
   }
   await browser.storage.local.set({ lastAnalysisTime: now });
 
-  const tabs = await browser.tabs.query({ currentWindow: true, pinned: false, hidden: false });
+  const tabs = await queryUserTabs();
   if (tabs.length === 0) throw new Error("No tabs to organize.");
 
   const tabData = tabs.map((t) => ({
@@ -115,20 +161,55 @@ async function handleAnalyzeTabs() {
 }
 
 async function handleApplyGroups({ groups }) {
-  const currentTabs = await browser.tabs.query({ currentWindow: true });
+  const currentTabs = await queryUserTabs();
   if (currentTabs.length === 0) throw new Error("No open tabs found.");
   const validTabIds = new Set(currentTabs.map((t) => t.id));
   const windowId = currentTabs[0].windowId;
 
-  const result = await applyGroupsByNative(groups, validTabIds, windowId);
+  // Native tab groups are unavailable on Firefox for Android: fall back to
+  // sorting tabs by group instead.
+  const supportsGroups = typeof browser.tabs.group === "function" && typeof browser.tabGroups?.update === "function";
+  const result = supportsGroups
+    ? await applyGroupsByNative(groups, validTabIds, windowId)
+    : await applyGroupsBySort(groups, validTabIds, windowId);
 
   pending = null;
   return result;
 }
 
 async function handleGetPendingGroups() {
-  const { id } = await browser.windows.getCurrent();
-  return pending?.windowId === id ? { ok: true, ...pending } : { ok: true };
+  if (!pending) return { ok: true };
+  try {
+    const { id } = await browser.windows.getCurrent();
+    return pending.windowId === id ? { ok: true, ...pending } : { ok: true };
+  } catch {
+    // windows API unavailable (Android): pending groups are still usable
+    return { ok: true, ...pending };
+  }
+}
+
+async function applyGroupsBySort(groups, validTabIds, windowId) {
+  const sortedIds = [];
+  for (const group of groups) {
+    for (const id of group.tabIds) {
+      if (validTabIds.has(id)) sortedIds.push(id);
+    }
+  }
+  if (sortedIds.length === 0) throw new Error("No groups could be applied. Try re-analyzing.");
+
+  // Pinned tabs stay at the front of the window
+  const all = await browser.tabs.query({});
+  const pinnedCount = all.filter((t) => t.windowId === windowId && t.pinned).length;
+
+  for (let i = 0; i < sortedIds.length; i++) {
+    try {
+      await browser.tabs.move(sortedIds[i], { index: pinnedCount + i });
+    } catch (err) {
+      console.warn(`Failed to move tab ${sortedIds[i]}:`, err);
+    }
+  }
+
+  return { ok: true, sortedOnly: true };
 }
 
 async function applyGroupsByNative(groups, validTabIds, windowId) {

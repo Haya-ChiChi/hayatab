@@ -68,7 +68,13 @@ async function init() {
     return;
   }
 
-  const tabs = await browser.tabs.query({ currentWindow: true });
+  // On Android the popup itself opens as a tab, so currentWindow would scope
+  // to the popup's window. Count the tabs in the user's window instead.
+  const allTabs = await browser.tabs.query({});
+  const extensionPrefix = browser.runtime.getURL("");
+  const userTabs = allTabs.filter((t) => !t.pinned && !t.hidden && !(typeof t.url === "string" && t.url.startsWith(extensionPrefix)));
+  const activeTab = userTabs.find((t) => t.active);
+  const tabs = activeTab ? userTabs.filter((t) => t.windowId === activeTab.windowId) : userTabs;
   document.getElementById("tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
 
   const model = data["model_" + provider] || "";
@@ -180,7 +186,22 @@ async function applyGroups() {
       showError(response.error);
       return;
     }
+    if (response.sortedOnly) {
+      document.querySelector("#view-done .done-text").textContent = "Tabs sorted by group!";
+    }
     showView("done");
+    // On Android the popup is a tab, and window.close() does not dismiss it;
+    // close our own popup tab explicitly. On desktop getCurrent() returns
+    // nothing for a popup, so this is a no-op there.
+    try {
+      const self = await browser.tabs.getCurrent();
+      if (self && typeof self.url === "string" && self.url.startsWith(browser.runtime.getURL(""))) {
+        setTimeout(() => browser.tabs.remove(self.id), 1200);
+        return;
+      }
+    } catch {
+      // tabs.getCurrent unavailable - fall through to window.close()
+    }
     setTimeout(() => window.close(), 1200);
   } catch (err) {
     showError(err.message || "Failed to apply groups.");
