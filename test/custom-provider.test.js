@@ -20,6 +20,7 @@ function makeEnv(store, { grantedOrigins = [], responder } = {}) {
     runtime: {
       onMessage: { addListener: (fn) => (listener = fn) },
       onInstalled: { addListener() {} },
+      getURL: (p) => `moz-extension://uuid/${p}`,
     },
     storage: {
       local: {
