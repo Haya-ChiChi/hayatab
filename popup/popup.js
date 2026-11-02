@@ -68,14 +68,12 @@ async function init() {
     return;
   }
 
-  // On Android the popup itself opens as a tab, so currentWindow would scope
-  // to the popup's window. Count the tabs in the user's window instead.
-  const allTabs = await browser.tabs.query({});
-  const extensionPrefix = browser.runtime.getURL("");
-  const userTabs = allTabs.filter((t) => !t.pinned && !t.hidden && !(typeof t.url === "string" && t.url.startsWith(extensionPrefix)));
-  const activeTab = userTabs.find((t) => t.active);
-  const tabs = activeTab ? userTabs.filter((t) => t.windowId === activeTab.windowId) : userTabs;
-  document.getElementById("tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
+  // Ask the background for the count, so it always matches what Analyze
+  // would pick up (same window, same filters) instead of being computed
+  // separately here.
+  const countRes = await browser.runtime.sendMessage({ action: "getTabCount" });
+  const count = countRes?.count ?? 0;
+  document.getElementById("tab-count").textContent = `${count} tab${count !== 1 ? "s" : ""} open`;
 
   const model = data["model_" + provider] || "";
   const providerName = PROVIDER_NAMES[provider] || provider;

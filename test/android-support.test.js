@@ -23,7 +23,17 @@ const ANDROID_TABS = [
   { id: 99, title: "Hayatab", url: "moz-extension://uuid/popup/popup.html", windowId: 2, active: true, pinned: false, favIconUrl: "" },
 ];
 
-function makeEnv({ android = true, groupsApi = false } = {}) {
+// Regression fixture for the wrong-window bug: the tab the user is looking
+// at in window 1 is pinned, and window 2 has its own active tab.
+const TWO_WINDOWS = [
+  { id: 1, title: "Pinned", url: "https://pinned.example.com", windowId: 1, active: true, pinned: true, favIconUrl: "" },
+  { id: 2, title: "Docs", url: "https://docs.example.com", windowId: 1, active: false, pinned: false, favIconUrl: "" },
+  { id: 3, title: "News", url: "https://news.example.com", windowId: 2, active: true, pinned: false, favIconUrl: "" },
+  { id: 4, title: "Shop", url: "https://shop.example.com", windowId: 2, active: false, pinned: false, favIconUrl: "" },
+  { id: 99, title: "Hayatab", url: "moz-extension://uuid/popup/popup.html", windowId: 3, active: true, pinned: false, favIconUrl: "" },
+];
+
+function makeEnv({ android = true, groupsApi = false, tabs = ANDROID_TABS, movesThrow = false } = {}) {
   const store = { provider: "claude", apiKey_claude: "sk-ant-1" };
   const moves = [];
   const grouped = [];
@@ -35,9 +45,18 @@ function makeEnv({ android = true, groupsApi = false } = {}) {
           `Type error for parameter queryInfo (Unexpected property "${"hidden" in queryInfo ? "hidden" : "pinned"}") for tabs.query.`
         );
       }
-      return JSON.parse(JSON.stringify(ANDROID_TABS));
+      let result = JSON.parse(JSON.stringify(tabs));
+      if (queryInfo.currentWindow) {
+        result = result.filter((t) => t.windowId === 1);
+        if (queryInfo.pinned === false) result = result.filter((t) => !t.pinned);
+        if (queryInfo.hidden === false) result = result.filter((t) => !t.hidden);
+      }
+      return result;
     },
-    move: async (id, { index }) => { moves.push([id, index]); },
+    move: async (id, { index }) => {
+      if (movesThrow) throw new Error("tabs.move failed");
+      moves.push([id, index]);
+    },
   };
   if (groupsApi) {
     tabsApi.group = async ({ tabIds }) => { grouped.push(tabIds); return 7; };
@@ -47,6 +66,7 @@ function makeEnv({ android = true, groupsApi = false } = {}) {
       onMessage: { addListener: (fn) => (listener = fn) },
       onInstalled: { addListener() {} },
       getURL: (p) => `moz-extension://uuid/${p}`,
+      getPlatformInfo: async () => ({ os: android ? "android" : "linux" }),
     },
     storage: {
       local: {
@@ -94,6 +114,16 @@ test("android: apply sorts tabs by group when the groups API is missing", async 
   assert.deepStrictEqual(moves, [[2, 1], [1, 2], [3, 3]]);
 });
 
+test("android: apply reports an error when no tab could be moved", async () => {
+  const { send, moves } = makeEnv({ android: true, groupsApi: false, movesThrow: true });
+  const analyzed = await send({ action: "analyzeTabs" });
+  assert.strictEqual(analyzed.ok, true);
+  const applied = await send({ action: "applyGroups", groups: analyzed.groups });
+  assert.strictEqual(applied.ok, false);
+  assert.match(applied.error, /No tabs could be moved/);
+  assert.deepStrictEqual(moves, []);
+});
+
 test("android: pending groups survive a missing windows API", async () => {
   const { send } = makeEnv({ android: true });
   await send({ action: "analyzeTabs" });
@@ -111,4 +141,36 @@ test("desktop: native grouping is still used when the groups API exists", async 
   assert.strictEqual(applied.sortedOnly, undefined);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(grouped)), [[2, 1], [3]]);
   assert.deepStrictEqual(moves, []);
+});
+
+test("desktop: pinned active tab does not switch organizing to another window", async () => {
+  const { send } = makeEnv({ android: false, tabs: TWO_WINDOWS });
+  const res = await send({ action: "analyzeTabs" });
+  assert.strictEqual(res.ok, true, JSON.stringify(res));
+  // Window 1 is the focused window; only its non-pinned tab is organized,
+  // even though its active tab is pinned
+  const seen = res.groups.flatMap((g) => g.tabIds).sort();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(seen)), [2]);
+});
+
+test("android: pinned active tab still selects its own window", async () => {
+  const { send } = makeEnv({ android: true, tabs: TWO_WINDOWS });
+  const res = await send({ action: "analyzeTabs" });
+  assert.strictEqual(res.ok, true, JSON.stringify(res));
+  const seen = res.groups.flatMap((g) => g.tabIds).sort();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(seen)), [2]);
+});
+
+test("tab count matches what analyze would pick up, on both platforms", async () => {
+  const androidEnv = makeEnv({ android: true, tabs: TWO_WINDOWS });
+  const androidCount = await androidEnv.send({ action: "getTabCount" });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(androidCount)), { ok: true, count: 1 });
+
+  const desktopEnv = makeEnv({ android: false, tabs: TWO_WINDOWS });
+  const desktopCount = await desktopEnv.send({ action: "getTabCount" });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(desktopCount)), { ok: true, count: 1 });
+
+  const androidFull = makeEnv({ android: true });
+  const fullCount = await androidFull.send({ action: "getTabCount" });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(fullCount)), { ok: true, count: 3 });
 });
