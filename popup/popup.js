@@ -68,8 +68,12 @@ async function init() {
     return;
   }
 
-  const tabs = await browser.tabs.query({ currentWindow: true });
-  document.getElementById("tab-count").textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} open`;
+  // Ask the background for the count, so it always matches what Analyze
+  // would pick up (same window, same filters) instead of being computed
+  // separately here.
+  const countRes = await browser.runtime.sendMessage({ action: "getTabCount" });
+  const count = countRes?.count ?? 0;
+  document.getElementById("tab-count").textContent = `${count} tab${count !== 1 ? "s" : ""} open`;
 
   const model = data["model_" + provider] || "";
   const providerName = PROVIDER_NAMES[provider] || provider;
@@ -180,7 +184,22 @@ async function applyGroups() {
       showError(response.error);
       return;
     }
+    if (response.sortedOnly) {
+      document.querySelector("#view-done .done-text").textContent = "Tabs sorted by group!";
+    }
     showView("done");
+    // On Android the popup is a tab, and window.close() does not dismiss it;
+    // close our own popup tab explicitly. On desktop getCurrent() returns
+    // nothing for a popup, so this is a no-op there.
+    try {
+      const self = await browser.tabs.getCurrent();
+      if (self && typeof self.url === "string" && self.url.startsWith(browser.runtime.getURL(""))) {
+        setTimeout(() => browser.tabs.remove(self.id), 1200);
+        return;
+      }
+    } catch {
+      // tabs.getCurrent unavailable - fall through to window.close()
+    }
     setTimeout(() => window.close(), 1200);
   } catch (err) {
     showError(err.message || "Failed to apply groups.");

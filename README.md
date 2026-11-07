@@ -7,7 +7,7 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 - **One-click analysis** - click "Analyze Tabs" and get suggested groups instantly
 - **Multiple AI providers** - Claude, OpenAI, Gemini, Z.AI, Ollama (fully local), or any OpenAI-compatible API (Custom API provider)
 - **Live model discovery** - fetch the model list directly from your provider's account
-- **Native tab groups** - uses Firefox's built-in tab grouping API
+- **Native tab groups** - uses Firefox's built-in tab grouping API (on Firefox for Android, where tab groups are unavailable, applying a result sorts your tabs by group instead)
 - **Privacy-first** - no telemetry, no tracking, API keys stored locally only
 
 ## Setup
