@@ -1,6 +1,6 @@
 # Privacy Policy - Hayatab
 
-**Last updated:** 2026-10-21
+**Last updated:** 2026-11-15
 
 ## What This Extension Does
 
@@ -38,12 +38,17 @@ The following is stored in your browser's local extension storage (`browser.stor
 - No cookies or tracking pixels
 - No third-party scripts
 
-The extension makes zero network requests except when you explicitly click "Analyze Tabs" or "Apply Groups".
+The extension makes network requests only when you explicitly ask it to:
+
+- **Analyze Tabs** sends tab titles and URLs to your chosen provider, as described above.
+- **Load available models** (the refresh button next to the model picker in settings) asks your chosen provider for its model list. This request carries only your API key for that provider, never any tab data.
+
+"Apply Groups" works entirely inside your browser and sends nothing.
 
 ## Permissions
 
 - **tabs**: Read tab titles and URLs for AI analysis
-- **tabGroups**: Create native browser tab groups
+- **tabGroups**: Create native browser tab groups (on Firefox for Android, where tab groups are unavailable, tabs are sorted by group instead)
 - **storage**: Save your settings locally
 - **Host permissions**: Connect to AI provider APIs and localhost (for Ollama). The Custom API provider additionally uses an *optional* host permission for the single base URL you configure, granted only when you set it up
 
