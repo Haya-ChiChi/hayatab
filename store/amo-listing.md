@@ -18,14 +18,15 @@ Sorts your open tabs into labeled groups with AI, in one click. Use Claude, Open
 
 ## Description
 
-AMO escapes HTML in descriptions now (`<strong>` shows up literally), so keep this plain text. Line breaks are kept. AMO turns "Z.AI" into a link to z.ai automatically.
+AMO escapes raw HTML (`<strong>` shows up literally) but supports a limited set of Markdown in the description: bold, italic, links, abbreviations, blockquotes, code and lists, but no headings ([Extension Workshop: Make use of Markdown](https://extensionworkshop.com/documentation/develop/create-an-appealing-listing/#make-use-of-markdown)). Leave a blank line before a list so it renders as one. AMO turns "Z.AI" into a link to z.ai automatically.
 
 ```
 Too many tabs open? Hayatab uses AI to sort them into labeled groups, so you can see what's going on at a glance.
 
-Click Analyze Tabs and Hayatab suggests groups like "Work", "YouTube" or "Shopping". Look over the suggestions, then click Apply to create them as native Firefox tab groups in one go.
+Click **Analyze Tabs** and Hayatab suggests groups like "Work", "YouTube" or "Shopping". Look over the suggestions, then click **Apply** to create them as native Firefox tab groups in one go.
 
-SUPPORTED AI PROVIDERS
+**Supported AI providers:**
+
 - Claude (Anthropic)
 - OpenAI
 - Gemini (Google)
@@ -35,14 +36,11 @@ SUPPORTED AI PROVIDERS
 
 Bring your own API key. The model list can be loaded straight from your provider account, so newly released models show up without waiting for an extension update.
 
-FIREFOX FOR ANDROID (EXPERIMENTAL)
-Android has no tab groups, so Hayatab sorts your tabs by group instead. It hasn't been tested on a real device yet, so please report anything that doesn't work on GitHub.
+**Firefox for Android (experimental):** Android has no tab groups, so Hayatab sorts your tabs by group instead. It hasn't been tested on a real device yet, so please [report anything that doesn't work on GitHub](https://github.com/Haya-ChiChi/hayatab/issues).
 
-COST PER ANALYSIS
-A fraction of a cent with cloud providers. Ollama and other local models are free.
+**Cost per analysis:** a fraction of a cent with cloud providers. Ollama and other local models are free.
 
-NO TELEMETRY. NO TRACKING.
-Only tab titles and URLs are sent, only to the provider you pick, and only when you click Analyze Tabs. API keys are stored locally in Firefox and never shared. Tab titles are treated as untrusted data, so a page can't hijack the AI through its title.
+**No telemetry. No tracking.** Only tab titles and URLs are sent, only to the provider you pick, and only when you click Analyze Tabs. API keys are stored locally in Firefox and never shared. Tab titles are treated as untrusted data, so a page can't hijack the AI through its title.
 ```
 
 ## Categories and tags
