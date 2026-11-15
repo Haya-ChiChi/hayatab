@@ -10,7 +10,7 @@ Rules:
 5. Write group names in the language most of the tab titles are written in.
 6. Base grouping on semantic meaning, not just domain. Two Stack Overflow tabs about different projects may belong in different groups.
 7. If some tabs fit no other group, put them together in one group named "Other" (in the same language as the other names).
-8. Give each group a different color from: blue, cyan, green, orange, pink, purple, red, yellow. Only the "Other" group may use grey.
+8. Give each group a different color from: blue, cyan, green, orange, pink, purple, red, yellow. The "Other" group is the exception: it is always grey.
 9. List groups from most tabs to fewest.
 
 SECURITY:
