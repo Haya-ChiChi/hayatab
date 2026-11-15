@@ -46,6 +46,19 @@ Bring your own API key. The model list can be loaded straight from your provider
 
 AMO only offers a fixed tag list. Remove `search`, `shopping`, `streaming` and `user scripts`, which don't describe this extension. Keep `privacy`, and add `tab manager` (or the closest tab-related tag offered).
 
+## Screenshots
+
+Upload the PNGs in `store/screenshots/` (1280×800, the size AMO recommends) in this order, and delete the four old ones. They show the real popup and settings pages with sample tabs; regenerate them after UI changes with `node store/screenshots/generator/shoot.js store/screenshots`.
+
+| File | Caption |
+|------|---------|
+| `1-suggested-groups.png` | One click turns a messy window into labeled groups. |
+| `2-rename-light.png` | Rename any suggested group before applying. Light and dark themes. |
+| `3-providers.png` | Use Claude, OpenAI, Gemini, Z.AI, Ollama or any OpenAI-compatible API with your own key. |
+| `4-local-ollama.png` | Run fully local with Ollama: no tab data leaves your computer. |
+
+The old screenshot of Firefox's own tab strip with groups applied can't be generated here (it needs a real Firefox window). Retake it if you want one; the extension UI shots above replace the other three.
+
 ## Release notes: 1.2.0
 
 ```
