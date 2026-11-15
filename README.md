@@ -8,7 +8,7 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 - **Multiple AI providers** - Claude, OpenAI, Gemini, Z.AI, Ollama (fully local), or any OpenAI-compatible API (Custom API provider)
 - **Live model discovery** - fetch the model list directly from your provider's account
 - **Native tab groups** - uses Firefox's built-in tab grouping API
-- **Firefox for Android (experimental)** - tab groups are unavailable on Android, so applying a result sorts your tabs by group instead. This hasn't been tested on a real device yet; please [open an issue](https://github.com/Haya-ChiChi/hayatab/issues) if something doesn't work
+- **Firefox for Android (experimental)** - requires Firefox for Android 142 or newer. Tab groups are unavailable on Android, so applying a result sorts your tabs by group instead. This hasn't been tested on a real device yet; please [open an issue](https://github.com/Haya-ChiChi/hayatab/issues) if something doesn't work
 - **Privacy-first** - no telemetry, no tracking, API keys stored locally only
 
 ## Setup
