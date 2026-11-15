@@ -7,8 +7,8 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 - **One-click analysis** - click "Analyze Tabs" and get suggested groups instantly
 - **Multiple AI providers** - Claude, OpenAI, Gemini, Z.AI, Ollama (fully local), or any OpenAI-compatible API (Custom API provider)
 - **Live model discovery** - fetch the model list directly from your provider's account
-- **Native tab groups** - uses Firefox's built-in tab grouping API
-- **Firefox for Android (experimental)** - tab groups are unavailable on Android, so applying a result sorts your tabs by group instead. This hasn't been tested on a real device yet; please [open an issue](https://github.com/Haya-ChiChi/hayatab/issues) if something doesn't work
+- **Native tab groups** - uses Firefox's built-in tab grouping API (requires Firefox 140 or newer)
+- **Firefox for Android (experimental)** - requires Firefox for Android 142 or newer. Tab groups are unavailable on Android, so applying a result sorts your tabs by group instead. This hasn't been tested on a real device yet; please [open an issue](https://github.com/Haya-ChiChi/hayatab/issues) if something doesn't work
 - **Privacy-first** - no telemetry, no tracking, API keys stored locally only
 
 ## Setup
@@ -39,6 +39,9 @@ Only tab titles and URLs are sent to your chosen AI provider when you click "Ana
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
 
-The bundled fonts, DM Sans and JetBrains Mono, are licensed under the SIL Open Font License 1.1; see `fonts/DM_Sans/OFL.txt` and `fonts/JetBrains_Mono/OFL.txt`.
+The bundled fonts are licensed under the SIL Open Font License 1.1:
+
+- DM Sans: [fonts/DM_Sans/OFL.txt](fonts/DM_Sans/OFL.txt)
+- JetBrains Mono: [fonts/JetBrains_Mono/OFL.txt](fonts/JetBrains_Mono/OFL.txt)

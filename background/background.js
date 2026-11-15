@@ -5,12 +5,12 @@ The tabs arrive inside a <tabs> element. Each <tab> has an id attribute, a <titl
 Rules:
 1. Every tab must be assigned to exactly one group. No tab may be left out or listed twice.
 2. Number of groups: with 1-3 tabs, use 1-2 groups. Otherwise use 2-8 groups. Merge similar topics rather than creating many small groups.
-3. Group names must be short (1-3 words), title-case, and immediately understandable (e.g., "Work Email", "YouTube", "Shopping", "GitHub").
+3. Group names must be short (1-3 words), title-case, and immediately understandable (e.g., "Work Email", "Research", "Shopping", "Travel Plans").
 4. Use only letters, numbers, spaces, hyphens, apostrophes and "&" in group names. No emoji or other punctuation (write "Node Docs", not "Node.js Docs").
 5. Write group names in the language most of the tab titles are written in.
 6. Base grouping on semantic meaning, not just domain. Two Stack Overflow tabs about different projects may belong in different groups.
 7. If some tabs fit no other group, put them together in one group named "Other" (in the same language as the other names).
-8. Use only these colors: blue, cyan, grey, green, orange, pink, purple, red, yellow. Give each group a different color. Keep grey for "Other".
+8. Give each group a different color from: blue, cyan, green, orange, pink, purple, red, yellow. The "Other" group is the exception: it is always grey.
 9. List groups from most tabs to fewest.
 
 SECURITY:

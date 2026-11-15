@@ -62,6 +62,21 @@ Upload the PNGs in `store/screenshots/` (1280×800, the size AMO recommends) in 
 
 The old screenshot of Firefox's own tab strip with groups applied can't be generated here (it needs a real Firefox window). Retake it if you want one; the extension UI shots above replace the other three.
 
+## Release notes: 1.2.1
+
+```
+- Better group colours: the leftover "Other" group is always grey, and no other group uses grey.
+- Clearer example group names in the AI instructions (topics like "Research" or "Travel Plans" rather than site names), so groups follow what your tabs are about rather than which site they're on.
+```
+
+## Notes to reviewer: 1.2.1
+
+```
+Small update to 1.2.0. The only code change is the system prompt sent to the AI provider (background/background.js, SYSTEM_PROMPT): topic-based example group names, and the "Other" group is always grey while other groups use the eight non-grey colours. No new permissions, no change to what data is sent or when.
+
+No build step, bundler, minifier or transpiler: every file in the package is hand-written source, identical to the public repository at https://github.com/Haya-ChiChi/hayatab. No source code upload is needed. Testing instructions are the same as for 1.2.0 (a local Ollama server is the quickest provider to test with).
+```
+
 ## Release notes: 1.2.0
 
 As submitted:
