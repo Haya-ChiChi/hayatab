@@ -18,14 +18,14 @@ Sorts your open tabs into labeled groups with AI, in one click. Use Claude, Open
 
 ## Description
 
-AMO keeps line breaks as typed and allows `<strong>`, so paste this as-is.
+AMO escapes HTML in descriptions now (`<strong>` shows up literally), so keep this plain text. Line breaks are kept. AMO turns "Z.AI" into a link to z.ai automatically.
 
 ```
 Too many tabs open? Hayatab uses AI to sort them into labeled groups, so you can see what's going on at a glance.
 
-Click <strong>Analyze Tabs</strong> and Hayatab suggests groups like "Work", "YouTube" or "Shopping". Look over the suggestions, then click <strong>Apply</strong> to create them as native Firefox tab groups in one go.
+Click Analyze Tabs and Hayatab suggests groups like "Work", "YouTube" or "Shopping". Look over the suggestions, then click Apply to create them as native Firefox tab groups in one go.
 
-<strong>Supported AI providers:</strong>
+SUPPORTED AI PROVIDERS
 - Claude (Anthropic)
 - OpenAI
 - Gemini (Google)
@@ -35,11 +35,14 @@ Click <strong>Analyze Tabs</strong> and Hayatab suggests groups like "Work", "Yo
 
 Bring your own API key. The model list can be loaded straight from your provider account, so newly released models show up without waiting for an extension update.
 
-<strong>Firefox for Android (experimental):</strong> Android has no tab groups, so Hayatab sorts your tabs by group instead. It hasn't been tested on a real device yet, so please report anything that doesn't work on GitHub.
+FIREFOX FOR ANDROID (EXPERIMENTAL)
+Android has no tab groups, so Hayatab sorts your tabs by group instead. It hasn't been tested on a real device yet, so please report anything that doesn't work on GitHub.
 
-<strong>Cost per analysis:</strong> a fraction of a cent with cloud providers. Ollama and other local models are free.
+COST PER ANALYSIS
+A fraction of a cent with cloud providers. Ollama and other local models are free.
 
-<strong>No telemetry. No tracking.</strong> Only tab titles and URLs are sent, only to the provider you pick, and only when you click Analyze Tabs. API keys are stored locally in Firefox and never shared. Tab titles are treated as untrusted data, so a page can't hijack the AI through its title.
+NO TELEMETRY. NO TRACKING.
+Only tab titles and URLs are sent, only to the provider you pick, and only when you click Analyze Tabs. API keys are stored locally in Firefox and never shared. Tab titles are treated as untrusted data, so a page can't hijack the AI through its title.
 ```
 
 ## Categories and tags
