@@ -39,6 +39,9 @@ Only tab titles and URLs are sent to your chosen AI provider when you click "Ana
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
 
-The bundled fonts, DM Sans and JetBrains Mono, are licensed under the SIL Open Font License 1.1; see `fonts/DM_Sans/OFL.txt` and `fonts/JetBrains_Mono/OFL.txt`.
+The bundled fonts are licensed under the SIL Open Font License 1.1:
+
+- DM Sans: [fonts/DM_Sans/OFL.txt](fonts/DM_Sans/OFL.txt)
+- JetBrains Mono: [fonts/JetBrains_Mono/OFL.txt](fonts/JetBrains_Mono/OFL.txt)
