@@ -75,6 +75,7 @@ const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiK
 const providerTabs = document.getElementById("provider-tabs");
 const providerConfig = document.getElementById("provider-config");
 const cooldownSelect = document.getElementById("cooldown");
+const autoSortBox = document.getElementById("auto-sort");
 const btnSave = document.getElementById("btn-save");
 const statusEl = document.getElementById("status");
 
@@ -523,13 +524,14 @@ function renderProviderConfig() {
 
 async function loadSettings() {
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown", "ollamaApiKeyRequired",
+    "provider", "cooldown", "autoSort", "ollamaApiKeyRequired",
     "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);
   savedProvider = allSavedData.provider || "claude";
   activeProvider = savedProvider;
   cooldownSelect.value = String(allSavedData.cooldown || 10000);
+  autoSortBox.checked = !!allSavedData.autoSort;
 
   renderProviderTabs();
   renderProviderConfig();
@@ -550,6 +552,7 @@ btnSave.addEventListener("click", async () => {
   const toSave = {
     provider: activeProvider,
     cooldown: parseInt(cooldownSelect.value, 10),
+    autoSort: autoSortBox.checked,
   };
 
   // Resolve model
@@ -662,7 +665,7 @@ btnSave.addEventListener("click", async () => {
   // Refresh local cache and re-render
   savedProvider = activeProvider;
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown", "ollamaApiKeyRequired",
+    "provider", "cooldown", "autoSort", "ollamaApiKeyRequired",
     "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);

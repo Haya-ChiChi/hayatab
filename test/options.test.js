@@ -66,8 +66,8 @@ function makeEnv(store, { grant = true } = {}) {
   const fetchCalls = [];
   const permCalls = { request: [], remove: [] };
   const root = new Element("body");
-  for (const id of ["provider-tabs", "provider-config", "cooldown", "btn-save", "status"]) {
-    const el = id === "cooldown" ? new Select("select") : new Element("div");
+  for (const id of ["provider-tabs", "provider-config", "cooldown", "auto-sort", "btn-save", "status"]) {
+    const el = id === "cooldown" ? new Select("select") : new Element(id === "auto-sort" ? "input" : "div");
     el.id = id;
     root.appendChild(el);
   }
@@ -213,4 +213,17 @@ test("extractModelIds: openai drops embedding/whisper/tts/dall-e, sorted and ded
     { id: "dall-e-3" }, { id: "gpt-a" }, { id: "gpt-b" },
   ] })`);
   assert.deepStrictEqual([...ids], ["gpt-a", "gpt-b"]);
+});
+
+test("auto-sort: the saved choice shows on load, and Save stores the box as ticked", async () => {
+  const store = { ...CUSTOM_STORE(), apiKey_custom: "k", autoSort: true };
+  const env = makeEnv(store);
+  await env.ready;
+  assert.strictEqual(env.$("auto-sort").checked, true);
+  env.$("auto-sort").checked = false;
+  await env.save();
+  assert.strictEqual(store.autoSort, false);
+  env.$("auto-sort").checked = true;
+  await env.save();
+  assert.strictEqual(store.autoSort, true);
 });
