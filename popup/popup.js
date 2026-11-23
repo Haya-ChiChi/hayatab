@@ -19,8 +19,8 @@ function showError(message) {
   showView("error");
 }
 
-function formatRelativeTime(timestamp) {
-  const diffMs = Date.now() - timestamp;
+function formatRelativeTime(timestamp, now = Date.now()) {
+  const diffMs = now - timestamp;
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return "just now";
   if (diffMin === 1) return "1 min ago";
@@ -54,9 +54,36 @@ function formatModelName(model) {
     .replace(/^glm-/, "GLM-");
 }
 
+// The status line under the buttons: auto-sort's last run (autoSortStatus, written by the background).
+function describeAutoStatus(status, now = Date.now()) {
+  if (!status || !status.at) return "Auto-sort: no runs yet";
+  const when = formatRelativeTime(status.at, now);
+  if (status.error) return "Auto-sort failed " + when + ": " + status.error;
+  if (!status.grouped) return "Auto-sort: nothing to group, " + when;
+  return "Auto-sort: grouped " + status.grouped + " tab" + (status.grouped === 1 ? "" : "s") + ", " + when;
+}
+
+async function sortAllNow() {
+  showView("loading");
+  document.querySelector("#view-loading .message").textContent = "Sorting every window...";
+  try {
+    const r = await browser.runtime.sendMessage({ action: "autoSortAll" });
+    if (!r?.ok) {
+      showError(r?.error || "Sorting failed.");
+      return;
+    }
+    document.querySelector("#view-done .done-text").textContent = r.grouped
+      ? "Grouped " + r.grouped + " tab" + (r.grouped === 1 ? "" : "s") + "."
+      : "Nothing to group.";
+    showView("done");
+  } catch (err) {
+    showError(err.message || "Something went wrong.");
+  }
+}
+
 async function init() {
   const data = await browser.storage.local.get([
-    "provider", "ollamaUrl", "customBaseUrl",
+    "provider", "ollamaUrl", "customBaseUrl", "autoSortStatus",
     "apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiKey_zai", "apiKey_custom",
     "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
   ]);
@@ -80,6 +107,7 @@ async function init() {
   const modelName = formatModelName(model);
   document.getElementById("provider-label").textContent =
     modelName ? `${providerName} \u00B7 ${modelName}` : providerName;
+  document.getElementById("auto-status").textContent = describeAutoStatus(data.autoSortStatus);
 
   const pending = await browser.runtime.sendMessage({ action: "getPendingGroups" });
   if (pending.ok && pending.groups) {
@@ -217,6 +245,7 @@ document.getElementById("btn-settings").addEventListener("click", () => {
 });
 
 document.getElementById("btn-analyze").addEventListener("click", analyzeTabs);
+document.getElementById("btn-sort-all").addEventListener("click", sortAllNow);
 document.getElementById("btn-reanalyze").addEventListener("click", analyzeTabs);
 document.getElementById("btn-apply").addEventListener("click", applyGroups);
 document.getElementById("btn-retry").addEventListener("click", () => showView("ready"));

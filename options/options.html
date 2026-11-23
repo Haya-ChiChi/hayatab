@@ -26,6 +26,17 @@
       </select>
     </div>
 
+    <div id="auto-sort-field">
+    <div class="field-check">
+      <input type="checkbox" id="auto-sort" />
+      <label for="auto-sort">Auto-sort new tabs</label>
+    </div>
+    <p class="notice">A few seconds after tabs finish loading, ungrouped tabs join a matching group, or a new group with other tabs on
+        the same topic, without the review step. Grouped and pinned tabs, and tabs you take out of a group, are left alone. Each
+        sort sends the ungrouped tabs' titles and URLs, and a few titles from each group, to your provider. Turning it on asks for access to session data, so a tab you took out
+      of a group stays out after a restart.</p>
+    </div>
+
     <div class="actions">
       <button id="btn-save" class="btn btn-primary">Save</button>
       <span id="status" class="status"></span>

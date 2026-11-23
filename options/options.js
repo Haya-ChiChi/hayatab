@@ -75,6 +75,21 @@ const ALL_KEY_FIELDS = ["apiKey_claude", "apiKey_openai", "apiKey_gemini", "apiK
 const providerTabs = document.getElementById("provider-tabs");
 const providerConfig = document.getElementById("provider-config");
 const cooldownSelect = document.getElementById("cooldown");
+const autoSortBox = document.getElementById("auto-sort");
+
+// Auto-sort needs native tab groups (absent on Firefox for Android), and asks for "sessions" when turned on, inside the click,
+// so a tab the user took out of a group stays out after a restart.
+if (!browser.tabGroups) {
+  const field = document.getElementById("auto-sort-field");
+  if (field) field.style.display = "none";
+}
+autoSortBox.addEventListener("change", async () => {
+  if (!autoSortBox.checked) return;
+  if (!(await browser.permissions.request({ permissions: ["sessions"] }))) {
+    autoSortBox.checked = false;
+    showStatus("Auto-sort needs access to session data to remember tabs you took out of a group.", "error");
+  }
+});
 const btnSave = document.getElementById("btn-save");
 const statusEl = document.getElementById("status");
 
@@ -523,13 +538,14 @@ function renderProviderConfig() {
 
 async function loadSettings() {
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown", "ollamaApiKeyRequired",
+    "provider", "cooldown", "autoSort", "ollamaApiKeyRequired",
     "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);
   savedProvider = allSavedData.provider || "claude";
   activeProvider = savedProvider;
   cooldownSelect.value = String(allSavedData.cooldown || 10000);
+  autoSortBox.checked = !!allSavedData.autoSort;
 
   renderProviderTabs();
   renderProviderConfig();
@@ -550,6 +566,7 @@ btnSave.addEventListener("click", async () => {
   const toSave = {
     provider: activeProvider,
     cooldown: parseInt(cooldownSelect.value, 10),
+    autoSort: autoSortBox.checked,
   };
 
   // Resolve model
@@ -569,6 +586,11 @@ btnSave.addEventListener("click", async () => {
   // Resolve credentials (per-provider)
   if (config.credentialType === "apiKey" || config.credentialType === "customEndpoint") {
     const value = document.getElementById("api-key")?.value.trim();
+    // API keys never hold a space or a backslash: a pasted key with a literal "\n" (copied from JSON or a terminal) is refused.
+    if (value && /[\s\\]/.test(value)) {
+      showStatus("That key has a space or a backslash in it (a pasted \"\\n\"?). Paste just the key.", "error");
+      return;
+    }
     if (value) {
       toSave[config.storageKey] = value;
     } else if (config.credentialType === "apiKey" && !allSavedData[config.storageKey]) {
@@ -662,7 +684,7 @@ btnSave.addEventListener("click", async () => {
   // Refresh local cache and re-render
   savedProvider = activeProvider;
   allSavedData = await browser.storage.local.get([
-    "provider", "cooldown", "ollamaApiKeyRequired",
+    "provider", "cooldown", "autoSort", "ollamaApiKeyRequired",
     "model_claude", "model_openai", "model_gemini", "model_zai", "model_ollama", "model_custom",
     ...ALL_KEY_FIELDS,
   ]);
