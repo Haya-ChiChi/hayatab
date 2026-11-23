@@ -40,6 +40,7 @@ const handlers = {
   applyGroups: handleApplyGroups,
   getPendingGroups: handleGetPendingGroups,
   getTabCount: handleGetTabCount,
+  autoSortAll: () => sortAllWindowsNow(),
 };
 
 browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -557,6 +558,8 @@ function parseAndValidateGroups(text, allTabIds) {
 const AUTO_DEBOUNCE_MS = 4_000;
 const AUTO_MIN_GAP_MS = 15_000;
 const AUTO_SAMPLE_TITLES = 5;
+const AUTO_MAX_TABS = 100; // per request; a bigger fleet is sorted in turns
+const AUTO_STARTUP_DELAY_MS = 10_000; // lets session restore finish first
 
 const AUTO_PROMPT = `You are a tab organization assistant. Some tabs in a browser window are not in any tab group. Place each one.
 
@@ -682,11 +685,13 @@ async function applyAutoAssignments(windowId, { join, create }) {
   const stillFree = new Set(tabs.filter((t) => isAutoCandidate(t, autoHandsOff)).map((t) => t.id));
   const groups = new Set((await browser.tabGroups.query({ windowId })).map((g) => g.id));
   const free = (ids) => ids.filter((id) => stillFree.has(id));
+  let grouped = 0;
   for (const { groupId, tabIds } of join) {
     const ids = free(tabIds);
     if (ids.length === 0 || !groups.has(groupId)) continue;
     try {
       await browser.tabs.group({ groupId, tabIds: ids });
+      grouped += ids.length;
     } catch (err) {
       console.warn(`Auto-sort: could not join group ${groupId}:`, err);
     }
@@ -696,24 +701,33 @@ async function applyAutoAssignments(windowId, { join, create }) {
     if (ids.length < 2) continue;
     try {
       const groupId = await browser.tabs.group({ tabIds: ids, createProperties: { windowId } });
+      grouped += ids.length;
       await browser.tabGroups.update(groupId, { title: g.name, color: g.color });
     } catch (err) {
       console.warn(`Auto-sort: could not create group "${g.name}":`, err);
     }
   }
+  return grouped;
 }
 
-async function runAutoSort(windowId) {
-  try {
-    if (!browser.tabGroups) return; // no tab groups (Firefox for Android): nothing to sort into
+// One request for one window. force: run even with the setting off ("Sort all now"). offered: tabs already sent in this
+// sweep, so a fleet larger than AUTO_MAX_TABS goes in turns. Newest tabs first, since they are the ones that just loaded.
+async function autoSortWindow(windowId, { force = false, offered = new Set() } = {}) {
+  const none = { ran: false, grouped: 0, remaining: 0, error: null };
+  if (!browser.tabGroups) return none; // no tab groups (Firefox for Android): nothing to sort into
+  if (!force) {
     const { autoSort } = await browser.storage.local.get(["autoSort"]);
-    if (!autoSort) return;
-    const tabs = await browser.tabs.query({ windowId });
-    await loadHandsOff(tabs.filter((t) => isAutoCandidate(t, autoHandsOff)));
-    const candidates = tabs.filter((t) => isAutoCandidate(t, autoHandsOff));
-    if (candidates.length === 0) return;
-    const groups = await browser.tabGroups.query({ windowId });
-    if (groups.length === 0 && candidates.length < 2) return; // a lone tab waits for company
+    if (!autoSort) return none;
+  }
+  const tabs = await browser.tabs.query({ windowId });
+  await loadHandsOff(tabs.filter((t) => isAutoCandidate(t, autoHandsOff)));
+  const all = tabs.filter((t) => isAutoCandidate(t, autoHandsOff) && !offered.has(t.id)).sort((a, b) => b.id - a.id);
+  const candidates = all.slice(0, AUTO_MAX_TABS);
+  if (candidates.length === 0) return none;
+  const groups = await browser.tabGroups.query({ windowId });
+  if (groups.length === 0 && candidates.length < 2) return none; // a lone tab waits for company
+  for (const t of candidates) offered.add(t.id);
+  {
     const settings = await providerSettings();
     const groupData = groups.map((g) => ({
       id: g.id,
@@ -723,10 +737,54 @@ async function runAutoSort(windowId) {
     const message = buildAutoMessage(candidates, groupData);
     const response = await callAPI(settings.provider, settings, [], AUTO_PROMPT, message);
     const answer = parseAutoAssignments(extractText(settings.provider, response), candidates.map((t) => t.id), groups.map((g) => g.id));
-    await applyAutoAssignments(windowId, answer);
+    const grouped = await applyAutoAssignments(windowId, answer);
+    return { ran: true, grouped, remaining: all.length - candidates.length, error: null };
+  }
+}
+
+// A window's sort, its outcome kept for the popup's status line (autoSortStatus). Errors are caught here.
+async function runAutoSort(windowId, options = {}) {
+  let result;
+  try {
+    result = await autoSortWindow(windowId, options);
   } catch (err) {
     console.warn("Auto-sort:", err.message);
+    result = { ran: true, grouped: 0, remaining: 0, error: err.message };
   }
+  if (result.ran) {
+    await browser.storage.local.set({ autoSortStatus: { at: Date.now(), grouped: result.grouped, error: result.error } });
+  }
+  return result;
+}
+
+async function userWindowIds() {
+  const windows = await browser.windows.getAll({ windowTypes: ["normal"] });
+  return windows.filter((w) => !w.incognito).map((w) => w.id);
+}
+
+// The popup's "Sort all windows now": every normal, non-private window, each in as many turns as its fleet needs.
+async function sortAllWindowsNow() {
+  const ids = await userWindowIds();
+  let grouped = 0;
+  let error = null;
+  for (const windowId of ids) {
+    const offered = new Set();
+    for (let turn = 0; turn < 10; turn++) {
+      const r = await runAutoSort(windowId, { force: true, offered });
+      grouped += r.grouped;
+      error ??= r.error;
+      if (r.error || !r.remaining) break;
+    }
+    if (error) break;
+  }
+  return { ok: !error, windows: ids.length, grouped, error };
+}
+
+// At browser start, restored tabs are not loaded, so they never report "complete": queue every window once instead.
+async function queueStartupSort(scheduler = autoScheduler) {
+  const { autoSort } = await browser.storage.local.get(["autoSort"]);
+  if (!autoSort || !browser.tabGroups) return;
+  for (const id of await userWindowIds()) scheduler.note(id);
 }
 
 // Per-window debounce, one run in flight, runs at least minGapMs apart.
@@ -768,3 +826,6 @@ browser.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && browser.tabGroups && isAutoCandidate(tab, autoHandsOff)) autoScheduler.note(tab.windowId);
 });
 browser.tabs?.onRemoved?.addListener((tabId) => autoHandsOff.delete(tabId));
+browser.runtime?.onStartup?.addListener(() => {
+  setTimeout(() => queueStartupSort().catch((err) => console.warn("Auto-sort:", err.message)), AUTO_STARTUP_DELAY_MS);
+});

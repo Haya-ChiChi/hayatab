@@ -586,6 +586,11 @@ btnSave.addEventListener("click", async () => {
   // Resolve credentials (per-provider)
   if (config.credentialType === "apiKey" || config.credentialType === "customEndpoint") {
     const value = document.getElementById("api-key")?.value.trim();
+    // API keys never hold a space or a backslash: a pasted key with a literal "\n" (copied from JSON or a terminal) is refused.
+    if (value && /[\s\\]/.test(value)) {
+      showStatus("That key has a space or a backslash in it (a pasted \"\\n\"?). Paste just the key.", "error");
+      return;
+    }
     if (value) {
       toSave[config.storageKey] = value;
     } else if (config.credentialType === "apiKey" && !allSavedData[config.storageKey]) {

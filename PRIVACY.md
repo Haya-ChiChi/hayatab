@@ -31,6 +31,7 @@ The following is stored in your browser's local extension storage (`browser.stor
 - Custom API base URL (and its API key, if you provided one)
 - Cooldown setting
 - Whether Auto-sort is on
+- Auto-sort's last result (when it ran, how many tabs it grouped, or its error), shown in the toolbar popup
 - Timestamp of last analysis (for rate limiting)
 
 ## Data NOT Collected
@@ -44,7 +45,8 @@ The following is stored in your browser's local extension storage (`browser.stor
 The extension makes network requests only when you explicitly ask it to, or after you turn Auto-sort on:
 
 - **Analyze Tabs** sends tab titles and URLs to your chosen provider, as described above.
-- **Auto-sort**, when you turn it on, sends ungrouped tabs' titles and URLs and group titles as tabs load, as described above.
+- **Auto-sort**, when you turn it on, sends ungrouped tabs' titles and URLs and group titles as tabs load, and once for each window a few seconds after the browser starts, as described above.
+- **Sort all windows now** (the toolbar popup) sends the same data for every non-private window, once, when you click it.
 - **Load available models** (the refresh button next to the model picker in settings) asks your chosen provider for its model list. This request carries only your API key for that provider, never any tab data.
 
 "Apply Groups" works entirely inside your browser and sends nothing.

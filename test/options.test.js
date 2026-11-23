@@ -243,3 +243,15 @@ test("auto-sort: hidden where there are no tab groups (Firefox for Android)", as
   await env.ready;
   assert.strictEqual(env.$("auto-sort-field").style.display, "none");
 });
+
+test("a pasted key with a literal \\n or a space in it is refused, not saved", async () => {
+  for (const bad of ["AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456\\n", "AIza Sy123"]) {
+    const store = { provider: "gemini" };
+    const env = makeEnv(store);
+    await env.ready;
+    env.$("api-key").value = bad;
+    await env.save();
+    assert.strictEqual(store.apiKey_gemini, undefined, bad);
+    assert.match(env.$("status").textContent, /key/i);
+  }
+});

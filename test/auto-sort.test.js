@@ -8,10 +8,10 @@ const vm = require("vm");
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const flush = () => new Promise((r) => setImmediate(r));
 
-function load({ tabs = [], groups = [], settings = {}, failGroupFor = [], sessionValues = {}, sessions = true, tabGroups = true } = {}) {
+function load({ tabs = [], groups = [], settings = {}, failGroupFor = [], sessionValues = {}, sessions = true, tabGroups = true, windows = [{ id: 1, type: "normal", incognito: false }] } = {}) {
   const listeners = {};
   const on = (name) => ({ addListener: (fn) => (listeners[name] = fn) });
-  const calls = { group: [], update: [], fetch: [], warn: [], setTabValue: [] };
+  const calls = { group: [], update: [], fetch: [], warn: [], setTabValue: [], stored: [] };
   let nextGroupId = 900;
   const state = { tabs: tabs.map((t) => ({ ...t })), groups: groups.map((g) => ({ ...g })) };
   const ctx = {
@@ -24,7 +24,8 @@ function load({ tabs = [], groups = [], settings = {}, failGroupFor = [], sessio
     __response: () => ({ ok: false, status: 500, text: async () => "", json: async () => ({}) }),
     browser: {
       runtime: { onMessage: on("onMessage"), onInstalled: on("onInstalled"), getPlatformInfo: async () => ({ os: "linux" }), getURL: () => "moz-extension://x/" },
-      storage: { local: { get: async () => ({ ...settings }), set: async () => {}, remove: async () => {} }, onChanged: on("storageChanged") },
+      storage: { local: { get: async () => ({ ...settings }), set: async (o) => calls.stored.push(plain(o)), remove: async () => {} }, onChanged: on("storageChanged") },
+      windows: { getAll: async () => windows.map((w) => ({ ...w })), getCurrent: async () => ({ ...windows[0] }) },
       tabs: {
         onUpdated: on("tabUpdated"), onRemoved: on("tabRemoved"),
         query: async (q) => state.tabs.filter((t) => q.windowId === undefined || t.windowId === q.windowId),
@@ -255,4 +256,62 @@ test("without the tab groups API (Firefox for Android), auto-sort does nothing a
   await ctx.runAutoSort(1);
   assert.strictEqual(calls.fetch.length, 0);
   assert.strictEqual(calls.warn.length, 0);
+});
+
+const claudeAnswer = (ctx, answer) => {
+  ctx.__response = () => ({ ok: true, status: 200, json: async () => ({ content: [{ type: "text", text: JSON.stringify(answer) }] }) });
+};
+const KEYED = { autoSort: true, provider: "claude", apiKey_claude: "k" };
+
+test("each run records its outcome for the popup: tabs grouped, or the error", async () => {
+  const good = load({ tabs: [web(1, "a"), web(2, "b")], settings: KEYED });
+  claudeAnswer(good.ctx, { assign: [{ tabId: 1, newGroup: "AB" }, { tabId: 2, newGroup: "AB" }], newGroups: [{ name: "AB", color: "red" }] });
+  await good.ctx.runAutoSort(1);
+  const ok = good.calls.stored.at(-1).autoSortStatus;
+  assert.strictEqual(ok.grouped, 2);
+  assert.strictEqual(ok.error, null);
+  assert.strictEqual(typeof ok.at, "number");
+
+  const bad = load({ tabs: [web(1, "a"), web(2, "b")], settings: KEYED });
+  bad.ctx.__response = () => ({ ok: false, status: 400, text: async () => JSON.stringify({ error: { message: "API key not valid." } }), json: async () => ({}) });
+  await bad.ctx.runAutoSort(1);
+  assert.strictEqual(bad.calls.stored.at(-1).autoSortStatus.error, "API key not valid.");
+});
+
+test("'Sort all now' sorts every normal, non-private window at once, even with Auto-sort off", async () => {
+  const tabs = [web(1, "a"), web(2, "b"), web(3, "c", { windowId: 2 }), web(4, "d", { windowId: 2 }), web(5, "e", { windowId: 3, incognito: true }), web(6, "f", { windowId: 3, incognito: true })];
+  const windows = [{ id: 1, type: "normal", incognito: false }, { id: 2, type: "normal", incognito: false }, { id: 3, type: "normal", incognito: true }];
+  const { ctx, calls } = load({ tabs, windows, settings: { provider: "claude", apiKey_claude: "k" } });
+  claudeAnswer(ctx, { assign: [], newGroups: [] });
+  const r = plain(await ctx.sortAllWindowsNow());
+  assert.strictEqual(calls.fetch.length, 2, "windows 1 and 2, not the private one");
+  assert.deepStrictEqual(r, { ok: true, windows: 2, grouped: 0, error: null });
+});
+
+test("'Sort all now' reports the first error", async () => {
+  const { ctx } = load({ tabs: [web(1, "a"), web(2, "b")], settings: { provider: "claude" } });
+  const r = plain(await ctx.sortAllWindowsNow());
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /API key/);
+});
+
+test("at startup, restored windows are queued for a sort when Auto-sort is on, and left alone when it is off", async () => {
+  const windows = [{ id: 1, type: "normal", incognito: false }, { id: 2, type: "normal", incognito: false }, { id: 3, type: "normal", incognito: true }];
+  const on = load({ windows, settings: KEYED });
+  const noted = [];
+  await on.ctx.queueStartupSort({ note: (w) => noted.push(w) });
+  assert.deepStrictEqual(noted, [1, 2]);
+  const off = load({ windows, settings: { provider: "claude", apiKey_claude: "k" } });
+  const none = [];
+  await off.ctx.queueStartupSort({ note: (w) => none.push(w) });
+  assert.deepStrictEqual(none, []);
+});
+
+test("a fleet larger than one request is sorted in turns: at most 100 tabs per call", async () => {
+  const tabs = Array.from({ length: 130 }, (_, i) => web(i + 1, "t" + i));
+  const { ctx, calls } = load({ tabs, settings: KEYED });
+  claudeAnswer(ctx, { assign: [], newGroups: [] });
+  await ctx.runAutoSort(1);
+  const sent = calls.fetch[0].body.messages[0].content;
+  assert.strictEqual((sent.match(/<tab id=/g) || []).length, 100);
 });
