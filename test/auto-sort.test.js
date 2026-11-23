@@ -310,8 +310,50 @@ test("at startup, restored windows are queued for a sort when Auto-sort is on, a
 test("a fleet larger than one request is sorted in turns: at most 100 tabs per call", async () => {
   const tabs = Array.from({ length: 130 }, (_, i) => web(i + 1, "t" + i));
   const { ctx, calls } = load({ tabs, settings: KEYED });
+  ctx.autoScheduler = { note() {} }; // the continuation is the next test's subject
   claudeAnswer(ctx, { assign: [], newGroups: [] });
   await ctx.runAutoSort(1);
   const sent = calls.fetch[0].body.messages[0].content;
   assert.strictEqual((sent.match(/<tab id=/g) || []).length, 100);
+});
+
+const sentIds = (call) => [...call.body.messages[0].content.matchAll(/<tab id="?(\d+)/g)].map((m) => Number(m[1]));
+
+test("an automatic sort of a fleet over 100 tabs continues in turns, each turn sending tabs not sent yet", async () => {
+  const tabs = Array.from({ length: 150 }, (_, i) => web(i + 1, "t" + i));
+  const { ctx, calls } = load({ tabs, settings: KEYED });
+  const noted = [];
+  ctx.autoScheduler = { note: (w) => noted.push(w) };
+  claudeAnswer(ctx, { assign: [], newGroups: [] }); // the model leaves them all ungrouped
+  await ctx.runAutoSort(1);
+  assert.deepStrictEqual(noted, [1], "the rest is queued through the paced scheduler");
+  await ctx.runAutoSort(1);
+  const first = sentIds(calls.fetch[0]), second = sentIds(calls.fetch[1]);
+  assert.strictEqual(first.length, 100);
+  assert.strictEqual(second.length, 50);
+  assert.strictEqual(new Set([...first, ...second]).size, 150, "no tab is sent twice in one sweep");
+  assert.deepStrictEqual(noted, [1], "nothing left, so no further turn");
+});
+
+test("'Sort all now' waits for an automatic run in flight: never two requests at once", async () => {
+  const { ctx, calls } = load({ tabs: [web(1, "a"), web(2, "b")], settings: KEYED });
+  claudeAnswer(ctx, { assign: [], newGroups: [] });
+  let open = 0, most = 0;
+  const real = ctx.fetch;
+  ctx.fetch = async (u, i) => {
+    open++; most = Math.max(most, open);
+    await new Promise((r) => setImmediate(r));
+    try { return await real(u, i); } finally { open--; }
+  };
+  await Promise.all([ctx.runAutoSort(1), ctx.sortAllWindowsNow()]);
+  assert.strictEqual(calls.fetch.length, 2);
+  assert.strictEqual(most, 1);
+});
+
+test("a second 'Sort all now' while one runs joins it instead of starting another", async () => {
+  const { ctx, calls } = load({ tabs: [web(1, "a"), web(2, "b")], settings: KEYED });
+  claudeAnswer(ctx, { assign: [], newGroups: [] });
+  const [a, b] = await Promise.all([ctx.sortAllWindowsNow(), ctx.sortAllWindowsNow()]);
+  assert.strictEqual(calls.fetch.length, 1);
+  assert.deepStrictEqual(plain(a), plain(b));
 });

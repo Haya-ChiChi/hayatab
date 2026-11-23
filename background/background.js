@@ -742,8 +742,25 @@ async function autoSortWindow(windowId, { force = false, offered = new Set() } =
   }
 }
 
+// Tabs already sent in a window's automatic sweep (windowId -> Set). A fleet over AUTO_MAX_TABS goes in turns through the
+// paced scheduler, each turn sending tabs not sent yet; the set is dropped once a turn leaves nothing behind.
+var autoDrain = new Map();
+// One sort at a time, automatic or "Sort all windows now", so two requests never send the same tabs at once.
+var autoChain = Promise.resolve();
+
+function runAutoSort(windowId, options = {}) {
+  const turn = autoChain.then(() => runAutoSortNow(windowId, options));
+  autoChain = turn.catch(() => {});
+  return turn;
+}
+
 // A window's sort, its outcome kept for the popup's status line (autoSortStatus). Errors are caught here.
-async function runAutoSort(windowId, options = {}) {
+async function runAutoSortNow(windowId, options) {
+  const automatic = !options.force;
+  if (automatic) {
+    if (!autoDrain.has(windowId)) autoDrain.set(windowId, new Set());
+    options = { ...options, offered: autoDrain.get(windowId) };
+  }
   let result;
   try {
     result = await autoSortWindow(windowId, options);
@@ -754,6 +771,10 @@ async function runAutoSort(windowId, options = {}) {
   if (result.ran) {
     await browser.storage.local.set({ autoSortStatus: { at: Date.now(), grouped: result.grouped, error: result.error } });
   }
+  if (automatic) {
+    if (result.remaining > 0) autoScheduler.note(windowId);
+    else autoDrain.delete(windowId);
+  }
   return result;
 }
 
@@ -763,7 +784,14 @@ async function userWindowIds() {
 }
 
 // The popup's "Sort all windows now": every normal, non-private window, each in as many turns as its fleet needs.
-async function sortAllWindowsNow() {
+var sortAllInFlight = null;
+function sortAllWindowsNow() {
+  // A second click while a sweep runs joins it.
+  sortAllInFlight ??= sweepAllWindows().finally(() => { sortAllInFlight = null; });
+  return sortAllInFlight;
+}
+
+async function sweepAllWindows() {
   const ids = await userWindowIds();
   let grouped = 0;
   let error = null;
