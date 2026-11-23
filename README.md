@@ -32,7 +32,7 @@ AI-powered tab grouping for Firefox. Analyzes your open tabs and organizes them 
 
 ## Privacy
 
-Only tab titles and URLs are sent to your chosen AI provider when you click "Analyze Tabs". Nothing else leaves your browser. See the full [privacy policy](PRIVACY.md).
+Only tab titles and URLs are sent to your chosen AI provider when you click "Analyze Tabs", or, with Auto-sort on, as tabs load (ungrouped tabs' titles and URLs, plus your group titles and a few tab titles from each). Nothing else leaves your browser. See the full [privacy policy](PRIVACY.md).
 
 ## Tests
 

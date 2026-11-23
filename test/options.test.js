@@ -62,11 +62,11 @@ function find(el, id) {
   return null;
 }
 
-function makeEnv(store, { grant = true } = {}) {
+function makeEnv(store, { grant = true, tabGroups = true } = {}) {
   const fetchCalls = [];
   const permCalls = { request: [], remove: [] };
   const root = new Element("body");
-  for (const id of ["provider-tabs", "provider-config", "cooldown", "auto-sort", "btn-save", "status"]) {
+  for (const id of ["provider-tabs", "provider-config", "cooldown", "auto-sort-field", "auto-sort", "btn-save", "status"]) {
     const el = id === "cooldown" ? new Select("select") : new Element(id === "auto-sort" ? "input" : "div");
     el.id = id;
     root.appendChild(el);
@@ -93,6 +93,7 @@ function makeEnv(store, { grant = true } = {}) {
       remove: async (p) => (permCalls.remove.push(p), true),
     },
   };
+  if (tabGroups) browser.tabGroups = {};
   const fetch = async (url, opts) => (fetchCalls.push({ url, opts }), { ok: true, status: 200, json: async () => ({ data: [] }) });
   const ctx = vm.createContext({ document, browser, fetch, Event, URL, console, setTimeout: () => 0 });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../options/options.js"), "utf8"), ctx);
@@ -226,4 +227,19 @@ test("auto-sort: the saved choice shows on load, and Save stores the box as tick
   env.$("auto-sort").checked = true;
   await env.save();
   assert.strictEqual(store.autoSort, true);
+});
+
+test("auto-sort: ticking the box asks for the sessions permission, and a refusal unticks it", async () => {
+  const env = makeEnv({ ...CUSTOM_STORE(), apiKey_custom: "k" }, { grant: false });
+  await env.ready;
+  env.$("auto-sort").checked = true;
+  await env.$("auto-sort").dispatchEvent(new Event("change"));
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(env.permCalls.request)), [{ permissions: ["sessions"] }]);
+  assert.strictEqual(env.$("auto-sort").checked, false);
+});
+
+test("auto-sort: hidden where there are no tab groups (Firefox for Android)", async () => {
+  const env = makeEnv(CUSTOM_STORE(), { tabGroups: false });
+  await env.ready;
+  assert.strictEqual(env.$("auto-sort-field").style.display, "none");
 });

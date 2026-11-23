@@ -76,6 +76,20 @@ const providerTabs = document.getElementById("provider-tabs");
 const providerConfig = document.getElementById("provider-config");
 const cooldownSelect = document.getElementById("cooldown");
 const autoSortBox = document.getElementById("auto-sort");
+
+// Auto-sort needs native tab groups (absent on Firefox for Android), and asks for "sessions" when turned on, inside the click,
+// so a tab the user took out of a group stays out after a restart.
+if (!browser.tabGroups) {
+  const field = document.getElementById("auto-sort-field");
+  if (field) field.style.display = "none";
+}
+autoSortBox.addEventListener("change", async () => {
+  if (!autoSortBox.checked) return;
+  if (!(await browser.permissions.request({ permissions: ["sessions"] }))) {
+    autoSortBox.checked = false;
+    showStatus("Auto-sort needs access to session data to remember tabs you took out of a group.", "error");
+  }
+});
 const btnSave = document.getElementById("btn-save");
 const statusEl = document.getElementById("status");
 

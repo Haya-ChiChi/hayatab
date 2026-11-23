@@ -589,8 +589,28 @@ Respond ONLY with valid JSON matching this schema. No prose, no markdown fences,
   "newGroups": [{"name": "string (1-3 words, title-case)", "color": "blue|cyan|green|orange|pink|purple|red|yellow"}]
 }`;
 
-// Tabs the user took out of a group; never auto-grouped again while they stay open.
+// Tabs the user took out of a group; never auto-grouped again while they stay open. The mark is also kept with the tab's
+// session data (sessions.setTabValue), so it survives a browser restart, when the optional "sessions" permission is granted.
+// (var, and ?. on the listeners below, so the tests' vm context can reach it and the older test fakes still load.)
 var autoHandsOff = new Set();
+const HANDS_OFF_KEY = "hayatabHandsOff";
+
+function markHandsOff(tabId) {
+  autoHandsOff.add(tabId);
+  browser.sessions?.setTabValue?.(tabId, HANDS_OFF_KEY, true)?.catch?.(() => {});
+}
+
+// Restored tabs have new ids: their marks come back from the session data.
+async function loadHandsOff(tabs) {
+  if (!browser.sessions?.getTabValue) return;
+  await Promise.all(tabs.map(async (t) => {
+    try {
+      if (await browser.sessions.getTabValue(t.id, HANDS_OFF_KEY)) autoHandsOff.add(t.id);
+    } catch {
+      // closed meanwhile
+    }
+  }));
+}
 
 function isAutoCandidate(tab, handsOff) {
   if (!tab || handsOff.has(tab.id)) return false;
@@ -685,9 +705,11 @@ async function applyAutoAssignments(windowId, { join, create }) {
 
 async function runAutoSort(windowId) {
   try {
+    if (!browser.tabGroups) return; // no tab groups (Firefox for Android): nothing to sort into
     const { autoSort } = await browser.storage.local.get(["autoSort"]);
     if (!autoSort) return;
     const tabs = await browser.tabs.query({ windowId });
+    await loadHandsOff(tabs.filter((t) => isAutoCandidate(t, autoHandsOff)));
     const candidates = tabs.filter((t) => isAutoCandidate(t, autoHandsOff));
     if (candidates.length === 0) return;
     const groups = await browser.tabGroups.query({ windowId });
@@ -742,7 +764,7 @@ var autoScheduler = createAutoScheduler({ run: runAutoSort });
 
 browser.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
   // A tab leaving a group: the user did it (auto-sort never ungroups), so it is theirs from now on.
-  if (changeInfo.groupId === -1) autoHandsOff.add(tabId);
-  if (changeInfo.status === "complete" && isAutoCandidate(tab, autoHandsOff)) autoScheduler.note(tab.windowId);
+  if (changeInfo.groupId === -1) markHandsOff(tabId);
+  if (changeInfo.status === "complete" && browser.tabGroups && isAutoCandidate(tab, autoHandsOff)) autoScheduler.note(tab.windowId);
 });
 browser.tabs?.onRemoved?.addListener((tabId) => autoHandsOff.delete(tabId));

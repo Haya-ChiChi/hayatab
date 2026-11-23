@@ -8,10 +8,10 @@ const vm = require("vm");
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const flush = () => new Promise((r) => setImmediate(r));
 
-function load({ tabs = [], groups = [], settings = {}, failGroupFor = [] } = {}) {
+function load({ tabs = [], groups = [], settings = {}, failGroupFor = [], sessionValues = {}, sessions = true, tabGroups = true } = {}) {
   const listeners = {};
   const on = (name) => ({ addListener: (fn) => (listeners[name] = fn) });
-  const calls = { group: [], update: [], fetch: [], warn: [] };
+  const calls = { group: [], update: [], fetch: [], warn: [], setTabValue: [] };
   let nextGroupId = 900;
   const state = { tabs: tabs.map((t) => ({ ...t })), groups: groups.map((g) => ({ ...g })) };
   const ctx = {
@@ -39,8 +39,15 @@ function load({ tabs = [], groups = [], settings = {}, failGroupFor = [] } = {})
         query: async (q) => state.groups.filter((g) => g.windowId === q.windowId),
         update: async (id, props) => calls.update.push(plain({ id, ...props })),
       },
+      // Firefox leaves the sessions API out until its optional permission is granted.
+      sessions: {
+        getTabValue: async (tabId, key) => sessionValues[tabId]?.[key],
+        setTabValue: async (tabId, key, value) => calls.setTabValue.push([tabId, key, value]),
+      },
     },
   };
+  if (!sessions) delete ctx.browser.sessions;
+  if (!tabGroups) delete ctx.browser.tabGroups;
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../background/background.js"), "utf8"), ctx);
   return { ctx, listeners, calls, state };
 }
@@ -219,4 +226,33 @@ test("a run end to end: Claude's answer joins and creates groups in that window"
   assert.ok(calls.fetch[0].body.messages[0].content.includes("Inbox"), "the group's sample titles go with it");
   assert.deepStrictEqual(calls.group, [{ tabIds: [3], groupId: 5, windowId: null }, { tabIds: [1, 2], groupId: null, windowId: 1 }]);
   assert.deepStrictEqual(calls.update, [{ id: 900, title: "Cooking", color: "orange" }]);
+});
+
+test("a tab taken out of a group is still hands-off after a restart: the mark is kept with the tab's session data", async () => {
+  const before = load();
+  before.listeners.tabUpdated(4, { groupId: -1 }, web(4, "Bank statement"));
+  assert.deepStrictEqual(plain(before.calls.setTabValue), [[4, "hayatabHandsOff", true]]);
+  // After a restart the tab has a new id; Firefox restores its session values.
+  const tabs = [web(14, "Bank statement"), web(15, "Shoes"), web(16, "Boots")];
+  const after = load({ tabs, sessionValues: { 14: { hayatabHandsOff: true } }, settings: { autoSort: true, provider: "claude", apiKey_claude: "k" } });
+  after.ctx.__response = () => ({ ok: true, status: 200, json: async () => ({ content: [{ type: "text", text: '{"assign":[]}' }] }) });
+  await after.ctx.runAutoSort(1);
+  assert.strictEqual(after.calls.fetch.length, 1);
+  const sent = after.calls.fetch[0].body.messages[0].content;
+  assert.ok(sent.includes("Shoes") && !sent.includes("Bank statement"));
+});
+
+test("without the sessions permission, a tab taken out of a group is still hands-off for this session", () => {
+  const { ctx, listeners, calls } = load({ sessions: false });
+  listeners.tabUpdated(4, { groupId: -1 }, web(4, "x"));
+  assert.strictEqual(ctx.autoHandsOff.has(4), true);
+  assert.strictEqual(calls.setTabValue.length, 0);
+});
+
+test("without the tab groups API (Firefox for Android), auto-sort does nothing and logs nothing", async () => {
+  const { ctx, calls, listeners } = load({ tabGroups: false, tabs: [web(1, "a"), web(2, "b")], settings: { autoSort: true, provider: "claude", apiKey_claude: "k" } });
+  listeners.tabUpdated(1, { status: "complete" }, web(1, "a"));
+  await ctx.runAutoSort(1);
+  assert.strictEqual(calls.fetch.length, 0);
+  assert.strictEqual(calls.warn.length, 0);
 });

@@ -14,7 +14,8 @@
   ],
   "optional_permissions": [
     "https://api.z.ai/*",
-    "https://*/*"
+    "https://*/*",
+    "sessions"
   ],
   "background": {
     "scripts": ["background/background.js"],
